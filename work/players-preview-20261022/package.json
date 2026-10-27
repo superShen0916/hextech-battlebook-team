@@ -1,0 +1,28 @@
+{
+  "name": "hextech-battlebook",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "build": "vite build",
+    "check": "tsc --noEmit",
+    "start": "node server.mjs",
+    "test": "node verify-navigation.mjs && node verify-version-intel.mjs && node verify-recaps.mjs"
+  },
+  "dependencies": {
+    "@tencent-ai/workbuddy-cloud-sdk": "0.1.4-dev.ca27990.202610161713",
+    "react": "19.2.6",
+    "react-dom": "19.2.6"
+  },
+  "devDependencies": {
+    "@types/node": "22.19.19",
+    "@types/react": "19.2.14",
+    "@types/react-dom": "19.2.3",
+    "@vitejs/plugin-react": "6.0.2",
+    "typescript": "5.9.3",
+    "vite": "8.3.5"
+  }
+}

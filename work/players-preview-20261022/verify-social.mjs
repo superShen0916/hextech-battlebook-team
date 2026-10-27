@@ -1,0 +1,20 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import ts from 'typescript';
+const code=ts.transpileModule(fs.readFileSync('lib/pair-story.ts','utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ES2022}}).outputText;
+const {buildPairStory,comparePlayerGames}=await import('data:text/javascript;base64,'+Buffer.from(code).toString('base64'));
+const d=JSON.parse(fs.readFileSync('../../work/build/snapshot.full.json','utf8')),dict=d.static,[a,b]=d.players;
+const s=buildPairStory(a,b,dict),reverse=buildPairStory(b,a,dict);
+assert.equal(s.games,s.row.summary.games);assert.equal(s.wins,s.row.summary.wins);assert.equal(s.losses,s.games-s.wins);assert.equal(s.complete,true);assert.equal(s.recent.length,Math.min(10,s.games));
+assert.equal(s.source.id,reverse.source.id);assert.deepEqual(s.people,[...reverse.people].reverse());assert.equal(s.longest,reverse.longest);
+for(const p of s.people){const profile=d.players.find(x=>x.name!==p.name),relation=profile.teammates.find(x=>x.name===p.name);assert.ok(Math.abs(p.kda-relation.summary.kda)<0.00001);assert.ok(Math.abs(p.dpm-relation.summary.dpm)<0.02);assert.equal(p.mvp,relation.awards.mvp);assert.equal(p.ace,relation.awards.ace);}
+assert.ok(s.honors.some(h=>h.title==='最铁搭档'));assert.ok(s.honors.every(h=>h.samples>=20));assert.ok(s.memories[0].match.player.win);
+const broken=structuredClone(s.source);broken.teammates.find(x=>x.name===s.row.name).match_ids=['legacy-unrelated'];
+const other=structuredClone(d.players.find(x=>x.id!==broken.id));other.teammates=[];
+const sparse=buildPairStory(broken,other,dict);assert.equal(sparse.complete,false);assert.equal(sparse.longest,null);assert.equal(sparse.people.find(x=>x.name===broken.name).kda,null);assert.equal(sparse.memories.length,0);
+const noData=buildPairStory({...a,teammates:[]},{...b,teammates:[]},dict);assert.equal(noData.games,null);assert.equal(noData.recent.length,0);
+const tied=[{...a,name:'乙',summary:{games:20}},{...b,name:'甲',summary:{games:20}},{...a,name:'多',summary:{games:21}},{...b,name:'少',summary:{games:0}},{...b,name:'缺',summary:{}}].sort(comparePlayerGames);
+assert.equal(tied[0].name,'多');assert.equal(tied.at(-1).name,'缺');assert.equal(tied[1].name,'甲');
+const share=fs.readFileSync('public/share/index.html','utf8');assert.ok(share.includes("const shared=params.get('scope')!=='personal'"));assert.ok(share.includes('朋友荣誉战报 · 荣誉 + 搭档榜'));assert.ok(share.includes('个人名片 · 表现 + 英雄'));
+console.log('PASS: duo 621/313, symmetric source and both real summaries, threshold honors, memories, missing relation safety, effective-games ordering, both share modes.');
+console.log(JSON.stringify({people:s.people,longest:s.longest,honors:s.honors,oldest:s.oldest,newest:s.newest},null,2));

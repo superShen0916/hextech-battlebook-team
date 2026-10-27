@@ -1,0 +1,25 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import {achievements,progressFor,personalAchievements,duoAchievements,achievementHolders} from './public/share/achievements.js';
+import {buildPairStory} from './public/share/pair-story.js';
+import {shareStyle} from './public/share/share-style.js';
+const d=JSON.parse(fs.readFileSync('../../work/build/snapshot.full.json','utf8')),dict=d.static;
+const personals=d.players.map(p=>({...p,history_scope:'personal'}));
+const shared=d.companions.filter(c=>!personals.some(p=>p.name===c.name)).map(c=>({...c,id:'shared-'+c.id,source_id:c.id,history_scope:'shared',coverage:{time_range:{}}}));
+const profiles=[...personals,...shared];
+assert.equal(achievements.length,16);assert.equal(new Set(achievements.map(d=>d.id)).size,16);
+for(const def of achievements){assert.ok(def.thresholds.every((t,i)=>t>0&&(!i||t>def.thresholds[i-1])));assert.equal(progressFor(def,null).value,null);assert.equal(progressFor(def,0).tier,0);for(let i=0;i<3;i++){assert.equal(progressFor(def,def.thresholds[i]).tier,i+1);assert.equal(progressFor(def,def.thresholds[i]-1).tier,i);}}
+const a=personalAchievements(personals[0]);assert.equal(a.find(x=>x.definition.id==='games').value,personals[0].summary.games);
+const g=personalAchievements(personals[1]);assert.equal(g.find(x=>x.definition.id==='mvp').value,personals[1].awards.mvp);
+const fake={id:'test',name:'test',coverage:{time_range:{}},summary:{},recent:[{id:'excluded',stats_eligible:false,player:{damage:999999,assists:999,penta_kills:2}},{id:'valid',stats_eligible:true,player:{damage:100001,assists:50}}]};
+const f=personalAchievements(fake);assert.equal(f.find(x=>x.definition.id==='damage').value,100001);assert.equal(f.find(x=>x.definition.id==='damage').witness.id,'valid');assert.equal(f.find(x=>x.definition.id==='assists').tier,2);assert.equal(f.find(x=>x.definition.id==='penta').value,null);assert.equal(f.find(x=>x.definition.id==='taken').value,null);
+const duo=duoAchievements(buildPairStory(...personals.slice(0,2),dict));assert.equal(duo[0].value,buildPairStory(...personals.slice(0,2),dict).games);assert.ok(duo.every(p=>p.value===null||p.value>=0));
+const holders=achievementHolders(profiles,dict),keys=holders.map(h=>h.key+'::'+h.progress.definition.id);assert.equal(new Set(keys).size,keys.length);
+const earned=holders.filter(h=>h.progress.tier>0),pairs=new Set(earned.filter(h=>h.players.length===2).map(h=>h.key));assert.ok(pairs.size>0);
+for(const h of holders)if(h.players.length===2)assert.notEqual(h.players[0].id,h.players[1].id);
+const style=shareStyle(personals[1],dict);assert.ok(style);assert.ok(style.text.replaceAll(",","").includes(String(personals[1].summary.games)));assert.ok(!style.punch.includes('别人'));assert.equal(shareStyle(fake,dict),null);
+console.log('PASS: 16 rule families / 48 inclusive thresholds; null vs zero; invalid matches excluded; full-history sample agreement and unique achieved pairs; current-sample positive style.');
+const consecutive={id:'streak',name:'streak',coverage:{time_range:{}},recent:[1,2,3,4,5,6,7,8,9].reverse().map(i=>({id:String(i),started_ms:i,stats_eligible:i!==9,player:{win:i===3?undefined:![4,5,6].includes(i),heal:i===9?999999:i===4?50000:0,performance:i===3?null:{score:50,award:[4,5,6].includes(i)?'ACE':'MVP'}}}))};
+const run=personalAchievements(consecutive);assert.equal(run.find(p=>p.definition.id==='carry-streak').value,2);assert.equal(run.find(p=>p.definition.id==='loss-streak').value,3);assert.equal(run.find(p=>p.definition.id==='healing').value,50000);assert.equal(run.find(p=>p.definition.id==='healing').tier,2);
+const missingTime=structuredClone(consecutive);delete missingTime.recent[1].started_ms;assert.equal(personalAchievements(missingTime).find(p=>p.definition.id==='carry-streak').value,null);
+console.log('PASS: 把把C excludes ACE and breaks on missing scores; 下把一定 breaks on unknown results; invalid games excluded; missing dates not inferred; ally healing separate.');

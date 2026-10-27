@@ -1,0 +1,50 @@
+Chinese champion and item names: Riot Games Data Dragon, patch 16.20.1.
+https://ddragon.leagueoflegends.com/cdn/16.20.1/data/zh_CN/champion.json
+https://ddragon.leagueoflegends.com/cdn/16.20.1/data/zh_CN/item.json
+League of Legends and related assets belong to Riot Games and their respective rights holders.
+
+Augment names and rarity: AramHex Data, github.com/czgreat/aramhex-data.
+Commit: f7a04db7c8477f4c7385d7d7d5dbd9b7aca6d49d, patches/16.20/normal/augments.json.
+License: CC BY-NC 4.0. Attribution required; non-commercial use only.
+https://creativecommons.org/licenses/by-nc/4.0/
+Names/rarity from this source are bundled. No augment win-rate dataset is bundled or displayed.
+This tool is for personal non-commercial use and is not endorsed by Tencent or Riot Games.
+
+Local image/effect asset refresh: 2026-10-21 (Asia/Shanghai).
+Hero portraits and item icons: Riot Games Data Dragon 16.20.1.
+https://ddragon.leagueoflegends.com/cdn/16.20.1/data/zh_CN/champion.json
+https://ddragon.leagueoflegends.com/cdn/16.20.1/data/zh_CN/item.json
+Images are downloaded from the corresponding /cdn/16.20.1/img/champion/ and /img/item/ URLs.
+All dictionary heroes are cached. Items are prefetched from locally observed numeric item IDs;
+the local database is opened read-only and no identity, record, or account data is uploaded.
+
+Chinese ARAM Mayhem effect text: Tencent's public KIWI dataset.
+https://game.gtimg.cn/images/lol/act/img/js/kiwi/kiwi_augments.json
+Source Last-Modified: Wed, 14 Oct 2026 07:41:31 GMT (16.20 period).
+Snapshot SHA-256: 3b63171374b610a074454254e31fe4fcee40019b95cd91e2d6bae4cda8147bb1
+The updater refuses a changed Tencent snapshot until its version is deliberately reverified.
+Text is matched by exact augment ID, API name and KIWI membership, with HTML removed.
+KIWI_JADE-only text is not used as a substitute for KIWI text.
+
+Augment icon mappings and same-patch numeric constants: CommunityDragon 16.20,
+an independent extractor of Riot game assets, not an official Riot service.
+https://raw.communitydragon.org/16.20/plugins/rcp-be-lol-game-data/global/zh_cn/v1/cherry-augments.json
+https://raw.communitydragon.org/16.20/game/maps/modespecificdata/kiwi.bin.json
+https://raw.communitydragon.org/16.20/game/en_us/data/menu/en_us/lol.stringtable.json
+Only exact IDs matched to entries present in kiwi.bin.json are used. Arena's same-name
+effects are not used. Constants are substituted only from the exact KIWI RootSpell
+when every level value is identical. Unresolved dynamic values remain explicitly marked;
+live tooltip performance counters are omitted and are not claimed as measured match data.
+The literal reference {{ Item_Keyword_OnHit }} resolves to the same-version string
+item_keyword_onhit = On-Hit. It is displayed as 攻击特效（On-Hit）; 攻击特效 is also
+used literally in the official Tencent KIWI dataset (augment 2016). {{SpellName}}
+means the champion-dependent relevant ability and is displayed as 对应技能.
+Effects are a 16.20 reference, not an exact reconstruction of another patch or champion state.
+
+Missing descriptions: 1310 (official dataset lists KIWI_JADE only), 1379 (not listed),
+2140 and 2143 (official desc/tooltip empty). These fall back to names and IDs.
+PNG files are cached under icons/{champions,items,augments}/. All referenced files pass
+PNG framing/CRC checks; failed or absent resources retain text-only fallback.
+Full source hashes, coverage and failures: assets.json. Refresh: scripts/update_assets.py.
+Riot/Tencent image and game-text rights remain with their respective owners;
+the existing AramHex CC BY-NC 4.0 attribution applies to its name/rarity dictionary.

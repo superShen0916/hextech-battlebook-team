@@ -1,0 +1,4 @@
+[
+  {"id": "player-one", "database": "mayhem.sqlite", "expected_puuid": "REPLACE_WITH_PLAYER_ONE_PUUID"},
+  {"id": "player-two", "database": "mayhem.sqlite", "expected_puuid": "REPLACE_WITH_PLAYER_TWO_PUUID"}
+]

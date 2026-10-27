@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>海克斯朋友荣誉战报 · 分享</title>
+<style>
+:root{color-scheme:dark;--bg:#0b1421;--text:#f0eee6;--muted:#9caabd;--gold:#e5c37c;--line:#344356}*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 50% 0,#24334c,transparent 65%),var(--bg);font:14px/1.65 "Microsoft YaHei","Segoe UI",sans-serif;color:var(--text)}main{max-width:1080px;margin:auto;padding:28px 24px 48px}.header{display:flex;align-items:center;justify-content:space-between;gap:20px}.brand{font-size:20px;font-weight:700;letter-spacing:2px}.back{color:var(--muted);text-decoration:none;font-size:12px}h1{font-size:25px;margin:24px 0 5px}.intro{color:var(--muted);margin:0 0 20px}.controls{display:flex;gap:12px;flex-wrap:wrap;align-items:end;padding:18px;background:#152337;border:1px solid var(--line);border-radius:12px}.controls label{display:flex;flex-direction:column;gap:6px;color:var(--muted);font-size:12px}select,button,.download{font:inherit;padding:10px 15px;border:1px solid var(--line);border-radius:7px;color:var(--text);background:#0e1b2b}button{cursor:pointer;font-weight:700;color:#162236;background:var(--gold);border-color:var(--gold)}button:disabled{cursor:wait;opacity:.55}.download{margin-left:auto;display:inline-flex;align-items:center;text-decoration:none;background:#23374c;color:var(--gold)}.download[aria-disabled="true"]{opacity:.45;pointer-events:none}select:focus-visible,button:focus-visible,a:focus-visible{outline:2px solid var(--gold);outline-offset:3px}#status{min-height:28px;color:var(--muted);font-size:12px;margin:12px 0;text-align:center}#status.error{color:#f0a3b2}.preview{display:flex;justify-content:center;min-height:180px}.preview img{display:block;width:100%;max-width:540px;height:auto;border-radius:5px;box-shadow:0 16px 70px #0008}.preview img:not([src]){display:none}.hint{text-align:center;color:var(--muted);font-size:12px;margin:16px 0}.empty{padding:50px 20px;text-align:center;color:var(--muted);border:1px dashed var(--line);border-radius:10px}.empty strong{color:var(--text);display:block;font-size:18px;margin-bottom:9px}[hidden]{display:none!important}@media(max-width:600px){main{padding:20px 12px 32px}.controls{gap:10px;padding:14px}.controls label{flex:1;min-width:130px}.controls button,.download{flex:1;justify-content:center;text-align:center;margin:0}h1{font-size:22px}.intro{font-size:12px}.preview img{border-radius:3px}}
+
+@media(max-width:600px){.controls label{flex:1 1 100%;min-width:0;font-size:13px}.controls select{width:100%;font-size:16px;min-height:46px}.controls button,.download{min-height:46px;font-size:14px;padding:10px 12px}.intro,.hint,#status{font-size:13px}.back{min-height:44px;display:inline-flex;align-items:center}main{padding-bottom:max(32px,env(safe-area-inset-bottom))}}
+</style>
+</head>
+<body><main>
+<header class="header"><div class="brand">海克斯战报</div><a class="back" href="/">返回玩家大厅 →</a></header>
+<h1>个人战报</h1><p class="intro">把真实同队战绩，做成一张可以分享的开黑战报。</p>
+<div class="controls"><label>分享内容<select id="share-mode"><option value="shared">朋友荣誉战报 · 荣誉 + 搭档榜</option><option value="personal">个人名片 · 表现 + 英雄</option></select></label><label>统计范围<select id="days"><option value="0">全部已上传对局</option></select></label><label>荣誉门槛<select id="minimum"><option value="20">至少 20 场有效同队局</option><option value="30">至少 30 场有效同队局</option></select></label><button id="generate">生成分享图</button><a id="download" class="download" download="海克斯搭档战报.png" aria-disabled="true">下载分享图 PNG</a></div>
+<div id="status" role="status">正在读取开黑战报…</div>
+<div id="empty" class="empty" hidden><strong>还没有可生成的战报</strong>当前范围没有已保存的标准海克斯对局，调整统计范围后重试。</div>
+<div class="preview"><img id="sharePreview" alt="当前账号的海克斯战报分享图"></div>
+<p class="hint" id="hint" hidden>原图为 1080 × 2680 像素。手机可长按图片保存，也可点击上方下载。</p>
+<canvas id="poster" width="1080" height="2680" hidden aria-hidden="true"></canvas>
+</main>
+<script type="module">
+import {shareStyle} from './share-style.js';
+import {personalAchievements} from './achievements.js';
+'use strict';
+const $=id=>document.getElementById(id),W=1080;
+const colors={bg:'#0b1626',panel:'#16283b',panelAlt:'#132336',line:'#34485e',white:'#f2eee4',muted:'#99afc4',gold:'#e5c37d',mint:'#81d5bf',blue:'#8abddd'};
+const font='"Microsoft YaHei", "Segoe UI", sans-serif';
+const awardTypes=[['best_partner','最佳拍档','胜率与样本兼顾'],['worst_partner','最佳损友','原始同队胜率最低'],['damage_carry','输出大腿','平均团队伤害占比'],['most_played','最铁搭档','有效同队场次'],['teamfighter','团战发动机','平均参团率'],['assist_master','助攻大师','场均助攻次数'],['protector','救命恩人','平均每分钟治疗与护盾'],['penta_king','五杀之王','已记录的五杀次数'],['mvp_star','MVP之星','自评 MVP 率 · v0.3'],['kill_harvester','人头收割机','场均击杀次数']];
+const AWARDS_Y=838,AWARD_STEP=260,AWARD_ROWS=Math.ceil(awardTypes.length/2),BOARD_Y=AWARDS_Y+AWARD_ROWS*AWARD_STEP+54,FOOTER_Y=BOARD_Y+658,H=1740+AWARD_ROWS*AWARD_STEP;
+let boot={static:{champions:{}}},generation=0;
+const number=v=>typeof v==='number'&&Number.isFinite(v);
+const fmt=(v,n=0)=>number(v)?v.toLocaleString('zh-CN',{maximumFractionDigits:n}):'—';
+const percent=v=>number(v)?fmt(v*100,1)+'%':'—';
+const day=v=>v&&Number.isFinite(new Date(v).getTime())?new Date(v).toLocaleDateString('zh-CN',{year:'numeric',month:'2-digit',day:'2-digit',timeZone:'Asia/Shanghai'}).replaceAll('/','.'):null;
+const today=()=>day(Date.now());
+const leaderName=p=>p?.name||p?.game_name||'姓名未记录';
+let snapshotPromise,visualPromise;
+async function api(path){
+ if(!snapshotPromise)snapshotPromise=fetch('/api/snapshot.json',{cache:'no-store'}).then(async response=>{if(!response.ok)throw Error('read_failed');return response.json()}).catch(error=>{snapshotPromise=null;throw error});
+ const snapshot=await snapshotPromise;
+ if(path==='/api/bootstrap')return {static:snapshot.static};
+ const params=new URLSearchParams(location.search),minimum=new URL(path,location.origin).searchParams.get('minimum')||'20';
+ const requested=params.get('player')||snapshot.default_player,legacyId=params.get('subject'),legacy=legacyId?snapshot.companions?.find(p=>p.id===legacyId&&(!params.get('name')||p.name===params.get('name'))):null;
+ if(legacyId&&!legacy)throw Error('legacy_subject_changed');
+ let subject=legacy||snapshot.players?.find(p=>p.id===requested);
+ if(!subject)throw Error('profile_unavailable');
+ if(subject.has_detail){const url=subject.detail_url||'/api/profiles/'+encodeURIComponent(subject.id)+'.json';const response=await fetch(url,{cache:subject.detail_url?'force-cache':'no-cache'});if(!response.ok)throw Error('profile_unavailable');const detail=await response.json();if(detail.id!==subject.id)throw Error('profile_mismatch');subject={...subject,...detail};}
+ const shared=params.get('scope')!=='personal';
+ $('share-mode').value=shared?'shared':'personal';
+ document.title=subject.name+' · 海克斯'+(shared?'共同':'个人')+'战报';
+ document.querySelector('h1').textContent=subject.name+'的'+(shared?'朋友荣誉战报':'个人名片');
+ document.querySelector('.intro').textContent=legacy?'当前为部分同队记录，尚未接入此玩家的独立个人历史。':shared?'打法风格、战报点评、成就徽章、十项搭档荣誉和搭档榜，一张图带走。可切换成个人名片。':'个人表现、打法风格、正向点评、成就徽章与常用英雄。仅包含已收录历史。';
+ const archive=snapshot.players?.find(p=>p.name===subject.name),backId=legacy?(archive?.id||'shared-'+subject.id):subject.id;
+ document.querySelector('.back').href='/?player='+encodeURIComponent(backId)+(legacy&&!archive?'&name='+encodeURIComponent(subject.name):'');
+ document.querySelector('.back').textContent='返回个人档案 →';
+ document.querySelector('label:has(#minimum)').hidden=!shared;
+ const report=subject.reports?.[minimum];if(!report)throw Error('report_unavailable');
+ const coverage=subject.coverage||{saved:subject.recent?.length||0,eligible:subject.summary?.games,missing:null,time_range:report.overview?.time_range};
+ if(!visualPromise)visualPromise=fetch('/visuals.json').then(r=>r.ok?r.json():{}).catch(()=>({}));
+ const visuals=await visualPromise,visual=visuals[archive?.id||(legacy?'shared-'+subject.id:subject.id)];
+ return {...report,account:{name:subject.name,game_name:subject.name},personal:subject,coverage,visual,style:shareStyle(subject,snapshot.static),badges:personalAchievements(subject),shared_mode:shared,subject_scope:legacy?'shared':''};
+}
+function roundRect(ctx,x,y,w,h,r,fill,stroke){ctx.beginPath();ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.quadraticCurveTo(x+w,y,x+w,y+r);ctx.lineTo(x+w,y+h-r);ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);ctx.lineTo(x+r,y+h);ctx.quadraticCurveTo(x,y+h,x,y+h-r);ctx.lineTo(x,y+r);ctx.quadraticCurveTo(x,y,x+r,y);ctx.closePath();if(fill){ctx.fillStyle=fill;ctx.fill()}if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=1.3;ctx.stroke()}}
+function text(ctx,value,x,y,size=24,color=colors.white,weight=400,align='left'){ctx.font=weight+' '+size+'px '+font;ctx.fillStyle=color;ctx.textAlign=align;ctx.textBaseline='alphabetic';ctx.fillText(String(value),x,y)}
+function fit(ctx,value,maxWidth,size=24,weight=400){ctx.font=weight+' '+size+'px '+font;let result=String(value);if(ctx.measureText(result).width<=maxWidth)return result;while(result.length&&ctx.measureText(result+'…').width>maxWidth)result=result.slice(0,-1);return result+'…'}
+function wrap(ctx,value,width,size=22,weight=400,maxLines=3){ctx.font=weight+' '+size+'px '+font;const lines=[];let line='';for(const char of String(value)){if(ctx.measureText(line+char).width>width&&line){lines.push(line);line=char;if(lines.length===maxLines-1)break}else line+=char}if(lines.length===maxLines-1){const consumed=lines.join('').length;line=fit(ctx,String(value).slice(consumed),width,size,weight)}if(line)lines.push(line);return lines.slice(0,maxLines)}
+function hex(ctx,x,y,r,stroke,fill){ctx.beginPath();for(let i=0;i<6;i++){const a=Math.PI/3*i-Math.PI/6,px=x+Math.cos(a)*r,py=y+Math.sin(a)*r;i?ctx.lineTo(px,py):ctx.moveTo(px,py)}ctx.closePath();if(fill){ctx.fillStyle=fill;ctx.fill()}ctx.strokeStyle=stroke;ctx.lineWidth=1.5;ctx.stroke()}
+function line(ctx,x,y,w,color=colors.line){ctx.strokeStyle=color;ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+w,y);ctx.stroke()}
+async function loadIcons(report){const people=[...(report.personal?.champions||[]),...(report.leaderboard||[]),...(report.awards||[]).flatMap(a=>a.leaders||[])],ids=[...new Set(people.map(p=>p.champion_id).filter(id=>id!==null&&id!==undefined))],icons=new Map();await Promise.all(ids.map(id=>new Promise(resolve=>{const data=boot.static?.champions?.[String(id)],url=data?.icon_url;if(typeof url!=='string'||!url.startsWith('/assets/'))return resolve();const img=new Image();let ended=false;const finish=ok=>{if(ended)return;ended=true;clearTimeout(timer);if(ok)icons.set(String(id),img);resolve()};const timer=setTimeout(()=>finish(false),4500);img.onload=()=>finish(true);img.onerror=()=>finish(false);img.src=url})));await Promise.all([['profile-avatar',report.visual?.avatar_url],['profile-cover',report.visual?.splash_url]].map(([key,url])=>new Promise(resolve=>{if(typeof url!=='string'||!url.startsWith('/assets/'))return resolve();const img=new Image();const timer=setTimeout(resolve,4500);img.onload=()=>{clearTimeout(timer);icons.set(key,img);resolve()};img.onerror=()=>{clearTimeout(timer);resolve()};img.src=url})));return icons}
+function portrait(ctx,icons,p,x,y,size=55){roundRect(ctx,x,y,size,size,10,'#293d50','#59718a');const img=icons.get(String(p?.champion_id));if(img){ctx.save();roundRect(ctx,x+2,y+2,size-4,size-4,8);ctx.clip();ctx.drawImage(img,x+2,y+2,size-4,size-4);ctx.restore()}else{text(ctx,(boot.static?.champions?.[String(p?.champion_id)]?.name||p?.champion_name||leaderName(p)).slice(0,2),x+size/2,y+size/2+7,Math.min(23,size*.37),colors.gold,600,'center')}}
+function awardValue(id,p){if(!p)return'暂无记录';if(id==='best_partner'||id==='worst_partner')return percent(p.win_rate);if(['damage_carry','teamfighter','mvp_star'].includes(id))return percent(p.value);if(id==='assist_master'||id==='kill_harvester')return fmt(p.value,1)+' /局';if(id==='most_played')return fmt(p.value??p.games)+' 场';if(id==='penta_king')return fmt(p.value)+' 次';return fmt(p.value,0)+' /分'}
+function awardCard(ctx,award,id,title,label,index,icons,minimum){const x=64+(index%2)*485,y=AWARDS_Y+Math.floor(index/2)*AWARD_STEP,w=467,h=242,leaders=Array.isArray(award?.leaders)?award.leaders:[],p=leaders[0];roundRect(ctx,x,y,w,h,16,colors.panel,'#425164');hex(ctx,x+w-45,y+40,22,'#5a5e50');text(ctx,String(index+1).padStart(2,'0'),x+w-45,y+46,17,colors.gold,600,'center');text(ctx,title,x+24,y+42,29,colors.gold,700);text(ctx,label,x+24,y+70,18,colors.muted);if(!p){text(ctx,'样本不足 / 暂无记录',x+24,y+128,27,colors.white,500);text(ctx,'需要可计算该指标的 '+minimum+' 场同队局',x+24,y+172,18,colors.muted);text(ctx,'继续开黑，等待下一位上榜',x+24,y+209,17,'#798da2');return}portrait(ctx,icons,p,x+24,y+91,60);const value=awardValue(id,p);text(ctx,fit(ctx,value,w-132,39,650),x+101,y+133,39,colors.white,650);const names=leaders.map(leaderName),tieCount=leaders.length,identity=tieCount>1?names.slice(0,2).join(' / ')+(tieCount>2?' 等 '+tieCount+' 位并列':' · 并列'):names[0];text(ctx,fit(ctx,identity,w-48,25,600),x+24,y+181,25,colors.white,600);let note=(id==='best_partner'||id==='worst_partner')?fmt(p.wins)+' 胜 / '+fmt(p.secondary?.result_games??p.games)+' 场有效同队':id==='most_played'?fmt(p.shared_games)+' 场已保存同队 · '+fmt(p.games)+' 场有效':id==='penta_king'?fmt(p.samples)+' 场有五杀记录字段':id==='mvp_star'?fmt(p.secondary?.mvp)+' 次自评 MVP / '+fmt(p.samples)+' 场可评':fmt(p.samples)+' 场指标有效样本';if(tieCount>1)note+=' · '+tieCount+' 位并列';text(ctx,fit(ctx,note,w-48,17),x+24,y+217,17,colors.muted)}
+function drawStyleBlock(ctx,report,y){
+ const style=report.style;if(!style)return;
+ roundRect(ctx,64,y,952,306,14,'#1b303a','#665f48');
+ text(ctx,'打法风格 / 战报里的你',88,y+39,22,colors.gold,600);
+ text(ctx,fit(ctx,style.tag,500,24,600),992,y+39,24,colors.mint,600,'right');
+ wrap(ctx,style.text,896,21,400,3).forEach((value,i)=>text(ctx,value,88,y+82+i*31,21,colors.white));
+ text(ctx,fit(ctx,'「'+style.punch+'」',896,23,500),88,y+190,23,colors.gold,500);
+ const badges=(report.badges||[]).filter(p=>p.tier>0).sort((a,b)=>b.tier-a.tier).slice(0,3);
+ badges.forEach((p,i)=>{const x=88+i*300;roundRect(ctx,x,y+220,284,48,7,'#c4ae6f14','#907d4c55');text(ctx,fit(ctx,p.definition.name+' '+['','I','II','III'][p.tier],260,20,500),x+14,y+251,20,colors.gold,500)});
+ text(ctx,'风格为样本点评；徽章为战报馆趣味成就，非官方奖项。',88,y+291,15,colors.muted);
+}
+function renderPersonal(report,icons){
+ const canvas=$('poster'),ctx=canvas.getContext('2d');canvas.width=W;canvas.height=1750;ctx.fillStyle=colors.bg;ctx.fillRect(0,0,W,1750);
+ const p=report.personal,s=p.summary||{},c=report.coverage||{},a=p.awards||{};
+ const cover=icons.get('profile-cover');if(cover){ctx.save();ctx.beginPath();ctx.rect(0,0,W,310);ctx.clip();const scale=Math.max(W/cover.width,310/cover.height);ctx.globalAlpha=.6;ctx.drawImage(cover,0,0,cover.width*scale,cover.height*scale);ctx.restore();const shade=ctx.createLinearGradient(0,0,W,0);shade.addColorStop(0,'#0b1626f5');shade.addColorStop(1,'#0b162655');ctx.fillStyle=shade;ctx.fillRect(0,0,W,310);}
+ const avatar=icons.get('profile-avatar');if(avatar){ctx.save();ctx.beginPath();ctx.arc(926,151,67,0,Math.PI*2);ctx.clip();ctx.drawImage(avatar,859,84,134,134);ctx.restore();ctx.strokeStyle=colors.gold;ctx.lineWidth=2;ctx.beginPath();ctx.arc(926,151,72,0,Math.PI*2);ctx.stroke();}
+
+ text(ctx,report.subject_scope?'海克斯战报 / 部分同队样本名片':'海克斯战报 / 个人战绩档案',64,85,24,colors.gold,500);
+ text(ctx,fit(ctx,report.account.name,740,60,700),64,174,60,colors.white,700);
+ text(ctx,day(c.time_range?.oldest_ms)+' — '+day(c.time_range?.newest_ms),64,224,24,colors.muted);
+ text(ctx,'已收录 '+fmt(c.saved)+' 场 · '+fmt(c.eligible)+' 场有效 · '+(number(c.missing)?fmt(c.missing)+' 场已发现待补':'部分同队样本'),64,272,23,colors.muted);
+ const metrics=[['胜率',percent(s.win_rate)],['KDA',fmt(s.kda,2)],['每分钟伤害',fmt(s.dpm)],['MVP',fmt(a.mvp)+' 次'],['败方 ACE',fmt(a.ace)+' 次'],['五杀',fmt(s.penta_kills)+' 次']];
+ metrics.forEach(([label,value],i)=>{const x=64+(i%3)*326,y=322+Math.floor(i/3)*157;roundRect(ctx,x,y,300,132,12,colors.panel);text(ctx,label,x+22,y+37,22,colors.muted);text(ctx,value,x+22,y+98,42,colors.white,600)});
+ drawStyleBlock(ctx,report,655);
+ text(ctx,'常用英雄',64,1071,29,colors.gold,600);
+ (p.champions||[]).slice(0,3).forEach((h,i)=>{const y=1107+i*96;portrait(ctx,icons,h,64,y,64);text(ctx,boot.static?.champions?.[String(h.champion_id)]?.name||h.champion_name,151,y+27,27,colors.white,500);text(ctx,fmt(h.games)+' 场 · 胜率 '+percent(h.win_rate)+' · KDA '+fmt(h.kda,2),151,y+63,21,colors.muted)});
+ text(ctx,'常用海克斯',64,1460,29,colors.gold,600);
+ const hexes=(p.preferences?.augments?.top3||[]).map(h=>boot.static?.augments?.[String(h.id)]?.name||('海克斯 #'+h.id));
+ hexes.forEach((name,i)=>text(ctx,fit(ctx,(i+1)+'. '+name,950,25,500),64,1509+i*41,25,colors.white,500));
+ line(ctx,64,1648,952);text(ctx,'统计仅基于已收录历史，不代表完整生涯。MVP / ACE 为自评 v0.2。',64,1694,21,colors.muted);
+ return canvas.toDataURL('image/png');
+}
+function renderPoster(report,icons){if(!report.shared_mode)return renderPersonal(report,icons);const canvas=$('poster'),ctx=canvas.getContext('2d');canvas.width=W;canvas.height=H;ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';const gradient=ctx.createLinearGradient(0,0,W,H);gradient.addColorStop(0,'#10263a');gradient.addColorStop(.48,colors.bg);gradient.addColorStop(1,'#15283d');ctx.fillStyle=gradient;ctx.fillRect(0,0,W,H);for(let row=0;row<Math.ceil(H/190)+1;row++)for(let col=0;col<7;col++)if((row*3+col)%4===0)hex(ctx,60+col*170+(row%2)*80,row*190,92,'#213c5044');ctx.fillStyle=colors.gold;ctx.fillRect(64,61,42,5);text(ctx,'海克斯战报  /  开黑档案',124,73,20,colors.gold,500);text(ctx,'STANDARD ARAM MAYHEM',1016,73,15,colors.muted,400,'right');const gameAvatar=icons.get('profile-avatar');if(gameAvatar){ctx.save();ctx.beginPath();ctx.arc(953,159,53,0,2*Math.PI);ctx.clip();ctx.drawImage(gameAvatar,900,106,106,106);ctx.restore();ctx.strokeStyle=colors.gold;ctx.beginPath();ctx.arc(953,159,57,0,2*Math.PI);ctx.stroke()}text(ctx,report.subject_scope?'同队样本荣誉战报':'朋友荣誉战报',64,159,58,colors.white,700);const owner=report.account?.game_name||report.account?.name;const ownerLine=owner?owner+' 的开黑战报':'已保存对局 · 我的开黑战报';text(ctx,fit(ctx,ownerLine,800,30,500),64,214,30,colors.gold,500);const range=report.overview?.time_range||{},start=day(range.oldest_ms),end=day(range.newest_ms),rangeText=start&&end?start+' — '+end:'当前已保存对局';text(ctx,rangeText,64,251,19,colors.muted);text(ctx,'生成于 '+today(),1016,251,18,colors.muted,400,'right');
+ const overview=report.overview||{},minimum=report.minimum_award_games??20;roundRect(ctx,64,280,952,116,14,'#1d3144','#52604f');const stats=[['总有效局',fmt(overview.eligible)+' 场'],['玩家胜率',percent(overview.win_rate)],['常玩队友',fmt(overview.companions)+' 位'],['荣誉门槛','≥'+fmt(minimum)+' 场']];for(let i=0;i<4;i++){const x=88+i*238;text(ctx,stats[i][0],x,316,19,colors.muted);text(ctx,stats[i][1],x,365,35,i===1?colors.gold:colors.white,650);if(i===1)text(ctx,fmt(overview.wins)+' 胜 / '+fmt(overview.result_samples)+' 场结果样本',x,386,13,colors.muted);if(i<3){ctx.fillStyle='#4d6072';ctx.fillRect(x+213,305,1,62)}}
+ drawStyleBlock(ctx,report,430);text(ctx,'这局，有你真好',64,810,29,colors.white,650);text(ctx,'十项同队荣誉',1016,810,18,colors.muted,400,'right');const awards=new Map((report.awards||[]).map(a=>[a.id,a]));awardTypes.forEach(([id,title,label],index)=>awardCard(ctx,awards.get(id),id,title,label,index,icons,minimum));
+ text(ctx,'常玩拍档榜',64,BOARD_Y,30,colors.white,650);text(ctx,'TOP 06  /  一起赢，也一起成长',1016,BOARD_Y,17,colors.muted,400,'right');text(ctx,'队友 / 代表英雄',80,BOARD_Y+45,18,colors.muted);text(ctx,'有效同队',551,BOARD_Y+45,17,colors.muted,400,'right');text(ctx,'同队胜率',690,BOARD_Y+45,17,colors.muted,400,'right');text(ctx,'KDA',826,BOARD_Y+45,17,colors.muted,400,'right');text(ctx,'伤害占比',992,BOARD_Y+45,17,colors.muted,400,'right');line(ctx,64,BOARD_Y+64,952);const rows=(report.leaderboard||[]).slice(0,6);if(!rows.length){roundRect(ctx,64,BOARD_Y+88,952,410,12,'#142638',colors.line);text(ctx,'暂时没有符合条件的拍档记录',540,BOARD_Y+283,29,colors.white,500,'center');text(ctx,'个人战绩已保留，荣誉等待更多同队样本',540,BOARD_Y+328,21,colors.muted,400,'center')}else rows.forEach((p,i)=>{const y=BOARD_Y+83+i*91;if(i%2===0)roundRect(ctx,64,y-3,952,85,9,'#1b2e4077');const rank=p.rank??i+1;text(ctx,String(rank).padStart(2,'0'),81,y+43,23,number(rank)&&rank<=3?colors.gold:colors.muted,600);portrait(ctx,icons,p,130,y+10,55);const name=fit(ctx,leaderName(p),279,25,600);text(ctx,name,201,y+35,25,colors.white,600);const champion=boot.static?.champions?.[String(p.champion_id)]?.name||p.champion_name;let secondary=p.qualified===false?'未达荣誉门槛':champion||'代表英雄未记录';const evaluated=p.secondary||{};if(number(evaluated.award_samples)&&evaluated.award_samples>0&&number(evaluated.mvp)&&number(evaluated.ace))secondary+=' · MVP '+fmt(evaluated.mvp)+' / ACE '+fmt(evaluated.ace);text(ctx,fit(ctx,secondary,279,16),201,y+62,16,colors.muted);text(ctx,fmt(p.games)+' 场',551,y+43,23,colors.white,500,'right');text(ctx,percent(p.win_rate),690,y+43,23,colors.mint,500,'right');text(ctx,fmt(p.secondary?.kda,2),826,y+43,23,colors.white,500,'right');text(ctx,percent(p.secondary?.damage_share),992,y+43,23,colors.white,500,'right')});
+ if((report.leaderboard||[]).length>6)text(ctx,'另有 '+((report.leaderboard||[]).length-6)+' 位同名次拍档，受版面所限未列出。',64,FOOTER_Y-19,16,colors.muted);line(ctx,64,FOOTER_Y,952,'#61705b');text(ctx,'一起打过的每一场，都值得记住。',64,FOOTER_Y+48,27,colors.gold,500);const footer=['范围：'+(report.subject_scope?'此玩家的部分同队样本':'当前玩家已保存历史中的同队记录')+'；拍档榜需 ≥'+minimum+' 场有效同队。','每项荣誉需 ≥'+minimum+' 场该指标有效样本；最佳拍档兼顾胜率与样本，并列如实标注。','MVP / ACE 为本工具自评 v'+String(report.personal?.awards?.version||'0.2').replace(/^v/,'')+'，非官方奖项；只计可评同队对局。'];footer.forEach((value,i)=>text(ctx,value,64,FOOTER_Y+89+i*30,17,colors.muted));return canvas.toDataURL('image/png')}
+async function generate(){const run=++generation,button=$('generate'),download=$('download');button.disabled=true;$('sharePreview').hidden=true;$('hint').hidden=true;download.setAttribute('aria-disabled','true');$('status').className='';$('status').textContent='正在汇总真实战绩并绘制分享图…';$('empty').hidden=true;try{const params=new URLSearchParams({minimum:$('minimum').value,days:$('days').value}),report=await api('/api/share-report?'+params);if(run!==generation)return;const saved=report.overview?.saved??report.overview?.eligible;if(!number(saved)||saved<=0){$('empty').hidden=false;$('sharePreview').removeAttribute('src');$('hint').hidden=true;$('status').textContent='当前范围暂无已保存战绩。';return}const icons=await loadIcons(report);if(run!==generation)return;const png=renderPoster(report,icons);$('sharePreview').src=png;$('sharePreview').hidden=false;download.href=png;download.download=report.account.name+'的海克斯'+(report.shared_mode?'同队':'个人')+'战报.png';download.setAttribute('aria-disabled','false');$('hint').hidden=false;$('status').textContent='分享图已生成 · '+W+' × '+$('poster').height+' PNG';$('hint').textContent='原图为 '+W+' × '+$('poster').height+' 像素。手机可长按图片保存，也可点击上方下载。'}catch(error){if(run===generation){$('status').className='error';$('status').textContent='暂时无法生成分享图，请稍后刷新页面重试。'}}finally{if(run===generation)button.disabled=false}}
+$('share-mode').onchange=()=>{const url=new URL(location.href);url.searchParams.set('scope',$('share-mode').value);history.replaceState(null,'',url);generate()};
+$('generate').onclick=generate;
+$('minimum').onchange=generate;
+$('days').onchange=generate;
+(async()=>{try{boot=await api('/api/bootstrap');await generate()}catch(error){$('status').className='error';$('status').textContent='暂时无法读取战报，请稍后重试。'}})();
+</script></body></html>

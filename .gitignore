@@ -1,0 +1,75 @@
+/data/*
+# 团队的完整真实配置随私有数据包分发，不进入新的源码仓库。
+/outputs/
+/backups/
+
+# 网站前端源码纳入版本控制（2026-10-23 确认的唯一真源）
+# 只跟踪可维护的源码，构建产物与抓取资产不入库（可由 sync_release.py / 抓取脚本重建）
+/work/*
+!/work/players-preview-20261022/
+!/work/gopher-pilot-20261021/
+/work/gopher-pilot-20261021/*
+!/work/gopher-pilot-20261021/scripts/
+/work/players-preview-20261022/dist/
+/work/players-preview-20261022/node_modules/
+/work/players-preview-20261022/before-experience-v2/
+/work/players-preview-20261022/public/api/
+/work/players-preview-20261022/public/matches/
+/work/players-preview-20261022/public/assets/
+/work/players-preview-20261022/public/share/
+!/work/players-preview-20261022/public/share/
+/work/players-preview-20261022/public/share/*
+!/work/players-preview-20261022/public/share/index.html
+
+__pycache__/
+*.pyc
+
+# 工具与临时产物
+.wbapp_*.genie
+/.workbuddy/
+/live_snap3.json
+
+# 依赖目录（2026-10-23 从 site/node_modules 迁到项目根，players-preview 用 junction 指向这里）
+/node_modules/
+/tools/browser/node_modules/
+
+# 评分输出是生成物，每次重算都变。只跟踪现役的 haido_scores_lp.json（几 KB，便于追溯线上分数）；
+# rating3 时代的旧输出每次重跑都是 8 MB，一律不入库。
+/haido/haido_scores.json
+/haido/haido_scores_v3.json
+/haido/haido_scores_lp.json
+/config/*.local.json
+/work/players-preview-20261022/_archive/
+/work/players-preview-20261022/*-validation.json
+/work/players-preview-20261022/verification-structure.json
+/work/players-preview-20261022/visual-assets-manifest.json
+/work/players-preview-20261022/public/visuals.json
+
+# 本地临时备份与一次性核对输出（2026-10-24 加入；改动前的手工备份不入库）
+*.bak-*
+/_urls.txt
+
+# Local credentials and runtime artifacts
+.env
+.env.*
+!.env.example
+*.sqlite
+*.sqlite-*
+*.db
+*.db-*
+*.log
+.venv/
+
+# Sites maintains the web source in its own Git checkout.
+/site/
+
+# 独立仓库的 v8 产物快照，已废弃
+/gh-pages-repo/
+
+# 开源前脱敏：本地私密配置与身份名单一律不入库
+# .env.local 存云服务 endpoint / publishable key；analytics-self.json 存本人设备 ID
+.env
+.env.local
+.env.*.local
+/data/analytics-self.json
+/work/players-preview-20261022/.env.local

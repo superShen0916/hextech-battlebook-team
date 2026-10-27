@@ -1,0 +1,8 @@
+{
+  "_comment": "本人设备名单模板。复制为 data/analytics-self.json 后填入自己的 visitor id 前 8 位（该文件已在 .gitignore 中，不会入库）。visits_pull.py / visits_report*.py 默认据此把本人访问从“外部访客”里剔除；命令行 --self 可临时追加。visitor_id 存在浏览器 localStorage，清缓存或换浏览器会重新生成，旧 ID 可保留并标 retired 用于回溯历史数据。",
+  "devices": [
+    {"id": "aaaaaaaa", "label": "我的 Windows 桌面", "added": "2026-01-01"},
+    {"id": "bbbbbbbb", "label": "我的手机", "added": "2026-01-01"},
+    {"id": "cccccccc", "label": "旧设备（已停用）", "added": "2026-01-01", "retired": true}
+  ]
+}

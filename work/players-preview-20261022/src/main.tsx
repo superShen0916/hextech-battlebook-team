@@ -1,0 +1,13 @@
+import React from 'react';
+import {createRoot} from 'react-dom/client';
+import App from './App';
+import Atmosphere from './Atmosphere';
+import './base.css';
+import './preview.css';
+import './experience.css';
+import './achievements.css';
+import './match-roster.css';
+import './weekly.css';
+import './arena.css';
+import './stage.css';
+createRoot(document.getElementById('root')!).render(<React.StrictMode><Atmosphere/><App /></React.StrictMode>);
