@@ -107,19 +107,33 @@ if args.shard_count>1:
 state['todo']=len(todo);update(True)
 print(json.dumps({'account':account['game_name'],'todo':len(todo),'already_stored':len(known)},ensure_ascii=False),flush=True)
 
-# Paged SUMMARY first: the whole queue usually sits inside page 0, so a tail of N
-# new matches costs one request instead of N (app/batch_fetch.py). Only queued
-# IDs are stored; the rest of the page is discarded. Any failure here is not
-# fatal - the per-match loop below is still the fallback.
+# Paged SUMMARY first: the queue usually sits inside the newest page, so a tail
+# of N new matches costs one page request instead of N (app/batch_fetch.py).
+# Only queued IDs are stored; the rest of the page is discarded. A page failure
+# falls back to per-match, except for the statuses that stop the whole batch.
+stopped=None
 covered={}
+
+def store_from_page(mid,raw):
+    """One write per match; a lost write lock must cost a retry, not the run."""
+    for db_attempt in range(6):
+        try:
+            put(raw,mid,'sgp_v1_summary_batch');return
+        except sqlite3.Error as e:
+            state['db_retries']=state.get('db_retries',0)+1
+            state['last_db_error']=type(e).__name__+': '+str(e)[:200]
+            if db_attempt==5:raise
+            time.sleep(2*(db_attempt+1))
+
 if todo:
     def fetch_page(start,count):
         return parse_summary_page(read(summary_page_path(target,start,count)))
     try:
         pages=cover_pages(todo,fetch_page)
         for mid,raw in pages['matched'].items():
+            if stopped:break
             try:
-                put(raw,mid,'sgp_v1_summary_batch');state['fetched']+=1
+                store_from_page(mid,raw);state['fetched']+=1
             except NotStandardMayhem as e:
                 store.discovery_status(key,mid,'skipped',e.code)
             except SourceError as e:
@@ -128,9 +142,10 @@ if todo:
         state['batch']={'pages':pages['pages'],'matched':len(covered),'stop':pages['stop'],'missing':len(pages['missing'])}
     except SourceError as e:
         state['batch']={'error':e.code,'status':e.status,'fallback':'per_match'}
+        if e.status in FATAL_STATUS or e.code in ('login_token_unavailable','local_connection_failed','local_request_failed'):
+            stopped='%s/%s'%(e.code,e.status);state['stopped_reason']=stopped
 update(True)
 
-stopped=None
 for mid in todo:
     if mid in covered:continue
     if args.limit and state['fetched']>=args.limit:break

@@ -6,16 +6,14 @@ SGP serves the same per-match payload two ways:
   /match-history-query/v1/products/lol/player/{puuid}/SUMMARY
         ?startIndex=N&count=M&tag=q_2400                              a page of matches
 
-Measured on HN1, 2026-10-28: every count from 1 to 100 returned 200; 50 games
-cost ~5.4 MB and ~0.7 s in one request. A 2026-10-21 sweep saw 503 for every
-count ("Connection retries limit exceeded. Response timed out"); that was
-upstream saturation during a batch of concurrent collectors, not a missing
-route, so the fallback is a retry later, never "this endpoint does not exist".
+Both bodies carry the identical match object, so a collector may take the whole
+queue from pages and keep the single-match route only as the fallback. Page order
+is listing order (newest first) inside the same bounded window the listing
+endpoint exposes (app/listing.py), so anything a page does not contain is outside
+the window and must not be paged after.
 
-The page order is the listing order: newest first, the same ~1000-ID window the
-listing endpoint exposes (see app/listing.py). A collector's queue is therefore
-almost always inside page 0, and a tail of N new matches costs one request
-instead of N.
+Upstream refuses the paged route when the whole edge is saturated; collectors must
+treat that as "retry later", not as "the route does not exist".
 
 This module is pure bookkeeping so collectors and tests share the same rules;
 the network call is passed in as `fetch_page(start, count)`.

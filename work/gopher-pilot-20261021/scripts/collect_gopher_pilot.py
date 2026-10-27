@@ -153,20 +153,28 @@ try:
             missing=[mid for i,mid in enumerate(missing) if i%shard_count==shard_index]
         if not missing:break
         if round_index==1:
-            # Paged SUMMARY first: one request covers the newest ~50 missing
-            # matches, the per-match loop then only handles what fell outside
-            # that page (app/batch_fetch.py). Rate/permission stops stay fatal.
+            # Paged SUMMARY first: one page covers the newest missing matches,
+            # the per-match loop then only handles what fell outside it
+            # (app/batch_fetch.py). Rate/permission stops stay fatal, and a lost
+            # write lock is retried like the per-match path below.
             def fetch_page(start,count):
                 return parse_summary_page(read(summary_page_path(target,start,count),'pilot_summary_batch'))
             try:
                 pages=cover_pages(missing,fetch_page)
                 for mid,raw in pages['matched'].items():
-                    try:
-                        put(raw,mid,'sgp_v1_summary_batch');state['new_remote_summaries']+=1
-                    except NotStandardMayhem as e:
-                        store.discovery_status(key,mid,'skipped',e.code)
-                    except SourceError as e:
-                        store.discovery_status(key,mid,'failed',str(e))
+                    for db_attempt in range(6):
+                        try:
+                            put(raw,mid,'sgp_v1_summary_batch');state['new_remote_summaries']+=1
+                            break
+                        except NotStandardMayhem as e:
+                            store.discovery_status(key,mid,'skipped',e.code);break
+                        except SourceError as e:
+                            store.discovery_status(key,mid,'failed',str(e));break
+                        except sqlite3.Error as e:
+                            state['db_retries']=state.get('db_retries',0)+1
+                            state['last_db_error']=type(e).__name__+': '+str(e)[:200]
+                            if db_attempt==5:raise
+                            time.sleep(2*(db_attempt+1))
                 missing=[mid for mid in missing if mid not in pages['matched']]
                 state['batch']={'pages':pages['pages'],'matched':len(pages['matched']),'stop':pages['stop'],'missing':len(pages['missing'])}
             except SourceError as e:
