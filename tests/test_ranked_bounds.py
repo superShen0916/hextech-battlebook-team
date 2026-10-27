@@ -8,7 +8,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'scripts'))
 from build_ranked_bounds import build
-from inject_ranked_bounds import inject, public_queue, public_rank
+from inject_ranked_bounds import inject, load_bounds, public_queue, public_rank
 
 
 def report_player(puuid, name, solo=None, flex=None):
@@ -76,6 +76,17 @@ class PublicProjectionTests(unittest.TestCase):
 
 
 class InjectTests(unittest.TestCase):
+    def test_missing_bounds_file_is_skipped_not_fatal(self):
+        # 团队仓库和 CI 拿到的源码里没有这份调研产物：缺文件要能继续构建。
+        with tempfile.TemporaryDirectory() as directory:
+            self.assertEqual(load_bounds(Path(directory) / 'absent.json'), {})
+            snapshot = Path(directory) / 'snapshot.full.json'
+            snapshot.write_text(json.dumps({'players': [{'id': 'a', 'rating': {'score': 1},
+                                                         'rank': {'stale': True}}]}), encoding='utf-8')
+            self.assertEqual(inject(snapshot, load_bounds(Path(directory) / 'absent.json')),
+                             {'injected': 0, 'players': 1, 'without_rank': ['a']})
+            self.assertNotIn('rank', json.loads(snapshot.read_text(encoding='utf-8'))['players'][0])
+
     def test_injects_only_rank_and_clears_stale_entries(self):
         with tempfile.TemporaryDirectory() as directory:
             snapshot = Path(directory) / 'snapshot.full.json'

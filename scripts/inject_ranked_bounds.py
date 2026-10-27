@@ -55,7 +55,12 @@ def public_rank(row):
 
 
 def load_bounds(path=BOUNDS):
-    data = json.loads(Path(path).read_text(encoding='utf-8'))
+    path = Path(path)
+    # 这份文件是本地调研产物，只随私有数据包分发；团队仓库/CI 拉下来的源码里没有它。
+    # 缺文件等于"没有任何段位证据"，跳过注入照样能构建；文件在但格式不对仍算错误。
+    if not path.is_file():
+        return {}
+    data = json.loads(path.read_text(encoding='utf-8'))
     if data.get('schema_version') != 1 or not isinstance(data.get('players'), dict):
         raise ValueError('invalid_ranked_bounds')
     return data['players']
@@ -83,7 +88,10 @@ def main():
     ap.add_argument('--bounds', type=Path, default=BOUNDS)
     ap.add_argument('--snapshot', type=Path, default=SNAPSHOT)
     args = ap.parse_args()
-    print(json.dumps(inject(args.snapshot, load_bounds(args.bounds)), ensure_ascii=False))
+    bounds = load_bounds(args.bounds)
+    report = inject(args.snapshot, bounds)
+    report['bounds'] = 'loaded' if Path(args.bounds).is_file() else 'missing'
+    print(json.dumps(report, ensure_ascii=False))
     return 0
 
 
