@@ -101,6 +101,7 @@ def verify(api=API, full=FULL, write_manifest=False, expected_week_ms=None):
     weekly_pool = load_weekly_calibration()['pool']
     period = week_start_ms(expected_week_ms)
     versions = set()
+    rank_bounds = {'solo': 0, 'flex': 0}
     eligible = 0
     for p in snapshot['players']:
         shard = json.loads((api.parent / p['detail_url'].lstrip('/')).read_text(encoding='utf-8'))
@@ -109,6 +110,19 @@ def verify(api=API, full=FULL, write_manifest=False, expected_week_ms=None):
         verify_rating(rating, period, p['id'])
         assert rating['base'] == round(frozen['players'][p['id']]['base'], 1), 'unfrozen_rating_base:' + p['id']
         assert p.get('rating') == rating == shard.get('rating'), 'mixed_rating_projection:' + p['id']
+        rank = p.get('rank')
+        # 摘要、分片和完整快照三处必须是同一份段位，任一处漂移都算投影错位。
+        assert rank == expected.get('rank') == shard.get('rank'), 'mixed_rank_projection:' + p['id']
+        if rank is not None:
+            assert set(rank) <= {'checked_at', 'solo', 'flex'}, 'unsafe_rank_fields:' + p['id']
+            for queue in ('solo', 'flex'):
+                row = rank.get(queue)
+                if row is None:
+                    continue
+                assert set(row) == {'current', 'lp', 'at_least', 'tier', 'basis'}, 'unsafe_rank_queue:' + p['id']
+                assert row['at_least'] or row['current'], 'empty_rank_queue:' + p['id']
+                if row['at_least']:
+                    rank_bounds[queue] += 1
         versions.add(rating['version'])
         alias = json.loads((api / 'profiles' / (p['id'] + '.json')).read_text(encoding='utf-8'))
         assert alias == shard, 'stale_profile_alias:' + p['id']
@@ -224,6 +238,7 @@ def verify(api=API, full=FULL, write_manifest=False, expected_week_ms=None):
               'snapshot_bytes': (api / 'snapshot.json').stat().st_size,
               'nights': len(recap['nights']), 'team_games': recap['team_games'],
               'weekly_reports': len(weekly['reports']), 'weekly_as_of_ms': weekly['as_of_ms'],
+              'rank_solo_bounds': rank_bounds['solo'], 'rank_flex_bounds': rank_bounds['flex'],
               'performance_version': PERFORMANCE_VERSION, 'rating_version': next(iter(versions)),
               'rating_week_start_ms': period, 'rating_week_end_ms': period + WEEK_MS}
     if write_manifest:

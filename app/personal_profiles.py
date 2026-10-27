@@ -21,7 +21,8 @@ def profile_sources(directory):
     if not config.is_file():
         return []
     rows = json.loads(config.read_text(encoding='utf-8-sig'))
-    if not isinstance(rows, list) or not 1 <= len(rows) <= 40:
+    # 上限只防误配：2026-10-28 起采集池 43 个账号全部上站。
+    if not isinstance(rows, list) or not 1 <= len(rows) <= 60:
         raise ValueError('invalid_personal_profiles')
     seen = set()
     result = []

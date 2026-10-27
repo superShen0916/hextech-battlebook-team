@@ -32,7 +32,8 @@ NAME = 'battlebook-data.zip'
 REPOSITORY = 'superShen0916/hextech-battlebook-team'
 CONFIGS = ('public-profiles.json', 'collection.json', 'stat-exclusions.json',
            'collection-exclusions.json', 'haido-baseline-v4.json',
-           'haido-weekly-calibration-v04.json', 'hexdata-ratings.json', 'champion-key-to-id.json')
+           'haido-weekly-calibration-v04.json', 'hexdata-ratings.json', 'champion-key-to-id.json',
+           'ranked-bounds.json')
 REQUIRED = ('data/mayhem.sqlite', 'data/public-profiles.json', 'data/collection.json',
             'data/stat-exclusions.json', 'data/haido-baseline-v4.json',
             'data/haido-weekly-calibration-v04.json', 'work/build/snapshot.full.json',
