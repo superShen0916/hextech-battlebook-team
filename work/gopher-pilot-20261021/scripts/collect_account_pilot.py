@@ -37,6 +37,7 @@ ap.add_argument('--shard-count',type=int,default=1)
 ap.add_argument('--limit',type=int,default=0,help='stop after this many matches (0 = no limit); a page counts as one request')
 ap.add_argument('--interval',type=float,default=4.0)
 args=ap.parse_args()
+if args.limit<0:ap.error('--limit must be >= 0')
 
 store=Store(DATA,account_key=args.account_key)
 with store.connect() as db:
