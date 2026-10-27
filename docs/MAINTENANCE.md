@@ -1,35 +1,35 @@
-# 发布机维护手册
+# 运行维护与恢复
 
-团队安装、本地运行和下载数据见TEAM-GUIDE；PR、发布接续和夜间上传见TEAM-PUBLISHING。本文只补充原发布机的恢复与日常维护。
+安装和本地开发见[开发指南](TEAM-GUIDE.md)，发布及夜间数据分发见[发布指南](TEAM-PUBLISHING.md)。
 
-## 当前入口
+## 持久数据与构建缓存
 
-- 项目根与WorkBuddy应用绑定目录保持原位置，唯一库data/mayhem.sqlite。
-- Sync-History.cmd：客户端登录时增量采集37个跟踪账号；名单和人数从当前配置读取，不在代码写死。
-- Update-Public-Site.cmd：同一完整链的增量构建和发布目录同步；Rebuild-Public-Site.cmd强制全量。
-- 修改验收统一Workflow.cmd plan/prepare/ready/online，不另编平行验收脚本。
-- Team.cmd pack/publish：完整团队数据包和GitHub Release分发。发布机拒绝download/install覆盖自身数据。
+唯一运行库、身份配置、展示/采集/统计排除规则、冻结基准和标尺都是持久状态。恢复或更新必须保持相互匹配，不能按缓存删除。
 
-## 数据和缓存
+`work/build/snapshot.full.json` 是完整构建输入，网页摘要不可覆盖它。计算缓存可重建，删除会增加构建耗时；现役dist、固定candidate、dist-previous及正式发布目录需要保留。
 
-数据库、名单/身份、排除规则、冻结基准及标尺是持久数据，不是缓存。work/build/snapshot.full.json为完整输入；public/api/snapshot.json只是摘要，不能反向替代。旧逐帧数据已停采，不恢复到日常库。
+## 恢复点
 
-work/build/cache为可重建计算缓存，丢失只会使构建变慢。现役dist、固定candidate、dist-previous三个槽位是正式构建机制，不能当旧历史清掉。数据、前端、验收指纹职责在ARCHITECTURE.md，正式同步核对完整文件清单和SHA256。
+发布机保留一个已验证的数据库/配置/源码恢复包和一个网站回滚ZIP。恢复点清单记录文件哈希、SQLite完整性及外键检查结果；数据Release用于开发分发，不代替本机恢复备份。
 
-## 恢复点与清理
+```powershell
+.\Run-Python.cmd scripts/check_state.py
+# 正式发布后额外验证线上身份
+.\Run-Python.cmd scripts/check_state.py --online
+```
 
-当前主库/配置/源码包：backups/restore-point/database.zip；网站回滚：同目录website.zip；清单manifest.json记录SHA256、SQLite完整性、外键和实际解压恢复测试。
+开发副本由 `config/workspace.json` 标记collaborator，核对已安装数据和冻结基准，不需要发布机的本地恢复文件，也不声称已验证正式托管。
 
-旧Git提交、个人讨论和历史文档只留一份legacy-audit.zip，不随团队仓库或数据Release分发。评分5.1审阅迁移的特定恢复证据rating-5.1-before.zip单独保留。不要删除冻结基准和周标尺。
+## 数据恢复
 
-scripts/team_cleanup.py先生成精确计划，fresh backup通过后才允许apply。删除前逐项确认绝对路径、无链接、内容哈希没变；删除拒绝立即停止并记录，不改保护开关或换工具绕过。实际清单及字节数见backups/restore-point/records/team-cleanup.json。
+停止所有写入和数据库连接，在维护窗口取得现有锁。先解压至临时位置，核对成员SHA256，运行 `PRAGMA integrity_check` 与 `PRAGMA foreign_key_check`，再替换唯一运行库及匹配配置。不要覆盖打开中的WAL数据库或恢复成第二套现役库。
 
-恢复主库时停止所有写入，先解压到临时目录、核对成员SHA256、运行PRAGMA integrity_check和foreign_key_check，再在维护窗口替换data/mayhem.sqlite及匹配配置。不要覆盖打开中的WAL数据库。website.zip只能通过固定发布目录和原应用恢复上线，不能将文件解压到未知目录后新建站点。
+评分状态的恢复需要匹配的基准、标尺和源码；主动重建或迁移冻结基准先经维护者明确审阅。不得为了修复缺文件而静默重算基准。
 
-## 状态与验证
+## 网站回滚
 
-发布机状态只维护STATUS卡片，CHANGELOG只写客观技术行为及验证证据，不保留个人聊天和分数偏好。结束前Run-Python.cmd scripts/check_state.py，涉及正式发布加--online。
+通过固定发布目录、原WorkBuddy应用和同一线上验收流程回滚。保留原域名与应用绑定，不能将ZIP解压到未知目录后新建替代站点。
 
-团队副本使用config/workspace.json标记collaborator，check_state核对已安装数据与冻结基准，不伪造本机恢复包或网站发布状态。
+## 清理规则
 
-本机与线上是两个状态。无托管工具时如实写“已构建/已同步未托管”，保留原站；不得使用Sites插件另建一个正式网站。当前应用与网址见STATUS和TEAM-PUBLISHING。
+清理前核对绝对路径、链接、引用、可重建性及有效恢复点，按明确清单删除。真实结果留在本机诊断记录；删除被拒绝立即停止，不更改保护开关或换工具绕过。运行日志、恢复包及私有本机配置不进入源码仓库或公开数据Release。

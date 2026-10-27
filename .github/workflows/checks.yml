@@ -1,4 +1,4 @@
-name: Team checks
+name: CI
 on:
   pull_request:
   push:
@@ -6,20 +6,42 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 env:
   PYTHONUTF8: '1'
 jobs:
+  repository-quality:
+    name: Repository quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.12'
+      - name: Check documentation, repository hygiene and action pins
+        run: python scripts/check_repository.py
   full-check:
     runs-on: windows-latest
     timeout-minutes: 40
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: '3.12'
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '22.23.3'
+          cache: npm
+          cache-dependency-path: |
+            work/players-preview-20261022/package-lock.json
+            tools/browser/package-lock.json
       - name: Install locked dependencies
         shell: pwsh
         run: python scripts/team.py setup
@@ -27,7 +49,6 @@ jobs:
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
-        # Forks use the same published dataset; they do not have their own Releases.
         run: python scripts/team.py download
       - name: Run the maintained full workflow
         shell: pwsh
@@ -39,7 +60,7 @@ jobs:
           python scripts/workflow.py prepare --files haido/rating_lp.py --scope pipeline
       - name: Preserve validation logs
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: validation-logs
           path: |

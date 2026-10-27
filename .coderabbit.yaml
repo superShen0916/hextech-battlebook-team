@@ -1,0 +1,26 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+language: zh-CN
+tone_instructions: '给出具体问题、影响和可验证修复建议，避免样式挑剔与重复评论。'
+reviews:
+  auto_review:
+    enabled: true
+    auto_incremental_review: true
+    drafts: false
+  path_filters:
+    - '!data/**'
+    - '!outputs/**'
+    - '!backups/**'
+    - '!**/node_modules/**'
+  path_instructions:
+    - path: '**'
+      instructions: '遵守AGENTS.md与docs/ARCHITECTURE.md。重点审阅真实回归、身份绑定、完整历史、冻结状态、锁、完整SHA256验收和凭据边界；AI建议不代替CI或人工合并决定。'
+    - path: 'haido/**'
+      instructions: '核对haido/README.md。禁止账号/昵称特判、静默改权重或重算冻结基准。逐局、周报与总分必须使用唯一公式。'
+    - path: 'app/**'
+      instructions: '关注本地HTTP输入校验、路径遍历、正则复杂度、SQL参数绑定和唯一数据库身份，不引入第二套统计实现。'
+    - path: 'scripts/**'
+      instructions: '保留sync/release锁、失败退出码、完整数据门禁及候选验证后替换。构建、Release上传和真正托管是不同状态。'
+    - path: '.github/**'
+      instructions: 'PR工作流只读、Action固定SHA，不向Fork暴露凭据，不用pull_request_target执行不可信代码。'
+    - path: 'docs/**'
+      instructions: '文档只维护稳定规范，不保存开发流水、试算、聊天、个人评价或验收日志；检查相对链接和实际入口一致。'

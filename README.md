@@ -1,5 +1,7 @@
 # 海克斯战报馆
 
+[![CI](https://github.com/superShen0916/hextech-battlebook-team/actions/workflows/checks.yml/badge.svg)](https://github.com/superShen0916/hextech-battlebook-team/actions/workflows/checks.yml) [![MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 朋友共同维护的海克斯大乱斗战绩站：玩家大厅、完整个人档案、六维雷达、十人战报、海斗分、搭档荣誉、当晚和多人回顾、分享图、成就与版本情报。
 
 - **本仓库**：[superShen0916/hextech-battlebook-team](https://github.com/superShen0916/hextech-battlebook-team)。公开仓库，任何人不经邀请即可克隆、阅读、改代码、提 Issue 或 PR。
@@ -27,7 +29,7 @@ Set-Location hextech-battlebook-team
 
 ## 维护流程
 
-修改前 `Workflow.cmd plan --files <文件>`，完成后 `prepare`，通过分支和PR合并。正式发布由发布机执行 `ready → WorkBuddy原应用托管 → online`；本地构建和GitHub Release均不代表网站上线。机器人入口后续单独接入。
+修改前 `Workflow.cmd plan --files <文件>`，完成后 `prepare`，通过分支和PR合并。正式发布由发布机执行 `ready → WorkBuddy原应用托管 → online`；本地构建和GitHub Release均不代表网站上线。自动检查、安全扫描与AI评审见[自动化规范](docs/AUTOMATION.md)。正式发布仍由维护者控制。
 
 Python回归：`Run-Python.cmd -m unittest discover -s tests -q`。prepare统一运行适用的Python回归、TypeScript、7项前端检查、数据/评分/隐私门禁及1440/390/320浏览器检查，详见[WORKFLOW](docs/WORKFLOW.md)。不另写平行的评分、构建或发布实现。
 
@@ -47,6 +49,6 @@ Python回归：`Run-Python.cmd -m unittest discover -s tests -q`。prepare统一
 
 所有玩家使用统一规则；个人基准来自历史公式计算并冻结，不得按账号或目标排名加减分。周分、基准和逐局说明共用唯一评分来源。不得删除基准重建，不采集逐帧时间轴，不减少完整个人内容。
 
-仓库公开可读并接受协作，尚未指定整个项目的开源许可证；第三方素材和依赖说明见[THIRD-PARTY-NOTICES](THIRD-PARTY-NOTICES.md)。团队源仓库不带旧Git提交、个人讨论或旧试算。
+项目自有代码与文档采用 [MIT License](LICENSE)。游戏素材、第三方数据和依赖保留各自许可，见[第三方说明](THIRD-PARTY-NOTICES.md)。
 
-发布机当前状态见STATUS.md，其他工作副本的数据版本见work/build/team-data.json。技术导航见[docs/README](docs/README.md)。
+开发环境的数据版本见 `work/build/team-data.json`。文档入口见[开发文档](docs/README.md)，AI开发助手先读[AGENTS.md](AGENTS.md)。

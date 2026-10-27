@@ -48,10 +48,41 @@ class DashboardApiTests(unittest.TestCase):
                 data = json.load(response)
             self.assertFalse(data['available'])
             self.assertEqual(data['reason'], 'timeline_not_collected')
-            for key, expected in [('HN1_999999', 404), ('bad-key', 400)]:
+            for key, expected in [('HN1_999999', 404), ('bad-key', 400), ('HN1_'+'0'*1000, 400)]:
                 with self.subTest(key=key), self.assertRaises(urllib.error.HTTPError) as caught:
                     urllib.request.urlopen(base + '/api/timeline/' + key)
                 self.assertEqual(caught.exception.code, expected)
+            for value in ('0'*1000+'.21', '16.'+'0'*1000):
+                with self.subTest(patch_length=len(value)), self.assertRaises(urllib.error.HTTPError) as caught:
+                    urllib.request.urlopen(base+'/api/overview?patch='+value)
+                self.assertEqual(caught.exception.code, 400)
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join(timeout=2)
+
+    def test_unknown_patch_remains_filterable_in_overview_and_companions(self):
+        raw = game(1000003)
+        raw.pop('gameVersion')
+        self.store.put(FakeSource.account_key, normalize(raw, FakeSource.account['puuid']))
+        server = LocalServer(('127.0.0.1', 0), self.store)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        base = f'http://127.0.0.1:{server.server_port}'
+        try:
+            with urllib.request.urlopen(base+'/api/overview?patch=unknown') as response:
+                data = json.load(response)
+            self.assertEqual(data['games'], 1)
+            self.assertEqual(data['recent'][0]['patch'], 'unknown')
+            with urllib.request.urlopen(base+'/api/companions') as response:
+                ref = json.load(response)['companions'][0]['ref']
+            route = '/api/companion/'+ref
+            with urllib.request.urlopen(base+route+'?patch=unknown') as response:
+                self.assertEqual(json.load(response)['shared_games'], 1)
+            for endpoint in ('/api/overview', route):
+                with self.subTest(endpoint=endpoint), self.assertRaises(urllib.error.HTTPError) as caught:
+                    urllib.request.urlopen(base+endpoint+'?patch=16.'+'0'*1000)
+                self.assertEqual(caught.exception.code, 400)
         finally:
             server.shutdown()
             server.server_close()

@@ -3,7 +3,7 @@ import {useEffect,useRef,useState} from 'react';
 import {track as trackEvent} from '../lib/analytics';
 
 const skins=[['hextech','海克斯鎏金','#d8b778'],['freljord','极地极光','#7de1e0'],['void','虚空星云','#c3a4ff'],['zaun','祖安霓虹','#a4ed7d']] as const;
-const tracks=[['sessions-vi','Sessions: Vi · 松弛 Lo-fi'],['sessions-diana','Sessions: Diana · 月下氛围']] as const;
+const tracks=[['sessions-vi','Sessions: Vi · 松弛 Lo-fi','https://soundcloud.com/leagueoflegends/sets/sessions-vi'],['sessions-diana','Sessions: Diana · 月下氛围','https://soundcloud.com/leagueoflegends/sets/sessions-diana']] as const;
 type Widget={bind:(event:string,fn:()=>void)=>void;setVolume:(n:number)=>void;play:()=>void;pause:()=>void;getCurrentSound:(fn:(s:{title?:string;user?:{username?:string}})=>void)=>void};
 type SoundCloud={Widget:((frame:HTMLIFrameElement)=>Widget)&{Events:{READY:string;PLAY:string;PAUSE:string;ERROR:string;FINISH:string}}};
 let sdk:Promise<SoundCloud>|undefined;
@@ -18,6 +18,7 @@ export default function Atmosphere(){
  const[open,setOpen]=useState(false),[skin,setSkin]=useState(()=>{try{const s=localStorage.getItem('battlebook-skin');return skins.some(([id])=>id===s)?s!:'hextech';}catch{return 'hextech';}});
  const[volume,setVolume]=useState(()=>{try{const v=Number(localStorage.getItem('battlebook-volume')??18);return Number.isFinite(v)?Math.min(35,Math.max(0,v)):18;}catch{return 18;}});
  const[enabled,setEnabled]=useState(false),[track,setTrack]=useState('sessions-vi'),[attempt,setAttempt]=useState(0),[playing,setPlaying]=useState(false),[status,setStatus]=useState('默认静音，点一下才开始。'),[credit,setCredit]=useState('');
+ const albumUrl=(tracks.find(([id])=>id===track)??tracks[0])[2];
  const frame=useRef<HTMLIFrameElement>(null),widget=useRef<Widget|null>(null),volumeRef=useRef(volume);volumeRef.current=volume;
  useEffect(()=>{document.documentElement.dataset.skin=skin;try{localStorage.setItem('battlebook-skin',skin);}catch{}},[skin]);
  useEffect(()=>{widget.current?.setVolume(volume);try{localStorage.setItem('battlebook-volume',String(volume));}catch{}},[volume]);
@@ -41,8 +42,8 @@ export default function Atmosphere(){
    <div className="music-actions"><button className="ghost" onClick={()=>{const action=!enabled?'start':playing?'pause':'resume';trackEvent('bgm_toggle',{detail:JSON.stringify({action})});if(!enabled){setEnabled(true);return;}if(playing)widget.current?.pause();else widget.current?.play();}}>{!enabled?'开启音乐':playing?'暂停音乐':'继续播放'}</button><button className="ghost" disabled={!enabled} onClick={()=>{trackEvent('bgm_toggle',{detail:JSON.stringify({action:'stop'})});setEnabled(false);setPlaying(false);setStatus('音乐已关闭。');setCredit('');}}>关闭音乐</button>{enabled&&<button className="ghost" onClick={()=>{trackEvent('bgm_toggle',{detail:JSON.stringify({action:'retry'})});setAttempt(a=>a+1);}}>重试连接</button>}</div>
    <label className="music-volume">音量 {volume}%<input aria-label="背景音乐音量" type="range" min="0" max="35" value={volume} onChange={e=>setVolume(Number(e.target.value))}/></label>
    <p role="status">{status}</p>
-   {enabled&&<iframe ref={frame} key={track+attempt} title="Riot Sessions 背景音乐播放器" width="100%" height="140" allow="autoplay" src={'https://w.soundcloud.com/player/?url='+encodeURIComponent('https://soundcloud.com/leagueoflegends/sets/'+track)+'&auto_play=false&hide_related=true&show_comments=false&show_user=true&show_reposts=false&visual=false'}/>}
-   {credit&&<p>{credit}</p>}<a href={'https://soundcloud.com/leagueoflegends/sets/'+track} target="_blank" rel="noreferrer">官方专辑 ↗</a><small> · Courtesy of Riot Games · <a href="https://www.leagueoflegends.com/en-us/event/sessions/" target="_blank" rel="noreferrer">Sessions / 音乐来源</a></small>
+   {enabled&&<iframe ref={frame} key={track+attempt} title="Riot Sessions 背景音乐播放器" width="100%" height="140" allow="autoplay" src={'https://w.soundcloud.com/player/?url='+encodeURIComponent(albumUrl)+'&auto_play=false&hide_related=true&show_comments=false&show_user=true&show_reposts=false&visual=false'}/>}
+   {credit&&<p>{credit}</p>}<a href={albumUrl} target="_blank" rel="noreferrer">官方专辑 ↗</a><small> · Courtesy of Riot Games · <a href="https://www.leagueoflegends.com/en-us/event/sessions/" target="_blank" rel="noreferrer">Sessions / 音乐来源</a></small>
   </section>
  </aside>;
 }
