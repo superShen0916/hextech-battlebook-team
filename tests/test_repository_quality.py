@@ -44,3 +44,19 @@ class RepositoryQualityTests(unittest.TestCase):
             errors = inspect(root, names)
             self.assertTrue(any('immutable' in e for e in errors))
             self.assertTrue(any('privileged' in e for e in errors))
+
+    def test_privileged_event_spellings_and_comments(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory); names = self.sample(root)
+            p = root/'.github/workflows/events.yml'; p.parent.mkdir(parents=True)
+            names.append('.github/workflows/events.yml')
+            for event in ('on:\n  pull_request_target:\n',
+                          'on: [push, pull_request_target]\n',
+                          'on: pull_request_target\n',
+                          'on:\n  - push\n  - pull_request_target\n'):
+                with self.subTest(event=event):
+                    p.write_text(event, encoding='utf-8')
+                    self.assertTrue(any('privileged' in e for e in inspect(root, names)))
+            p.write_text('on: pull_request # pull_request_target is forbidden\n'
+                         '# on: pull_request_target\n', encoding='utf-8')
+            self.assertEqual(inspect(root, names), [])

@@ -43,6 +43,10 @@
 
 `build_id` 标识数据快照，`artifact_sha256` 标识整份发布目录。发布验证使用完整文件哈希，不能只比较build_id、大小或mtime。源码、数据、自然周、依赖或产物变化会使ready拒绝过期回执。
 
+## 工作区状态
+
+`Team.cmd download`将开发副本登记为collaborator，文档prepare核对安装数据和冻结基准，不需要发布机状态卡。原发布机继续保留本机STATUS.md与docs/history/CHANGELOG.md，检查器按其中事实核对运行库、产物与恢复点；接收团队源码时保留这两份本机资料，不从源码仓库恢复或覆盖它们。它们被Git忽略，不随公开源码或战绩包分发。开发副本不能通过修改工作区角色代替正式托管验收。
+
 ## 回执与失败恢复
 
 本地日志和JSON回执写入 `outputs/workflow/<run_id>/` 与 `work/build/`，不提交Git或抄入参考文档。只有成功prepare生成可发布凭证；构建、同步与实际托管分别记录，不能把本机成功当作上线。

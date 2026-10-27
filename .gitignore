@@ -2,6 +2,9 @@
 # 团队的完整真实配置随私有数据包分发，不进入新的源码仓库。
 /outputs/
 /backups/
+/STATUS.md
+/WORKBUDDY-HANDOFF.txt
+/docs/history/
 
 # 网站前端源码纳入版本控制（2026-10-23 确认的唯一真源）
 # 只跟踪可维护的源码，构建产物与抓取资产不入库（可由 sync_release.py / 抓取脚本重建）

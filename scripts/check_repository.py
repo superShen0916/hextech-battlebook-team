@@ -70,7 +70,7 @@ def inspect(root, names):
                     continue
                 if not re.fullmatch(r'[A-Za-z0-9_.-]+/[A-Za-z0-9_./-]+@[0-9a-f]{40}', action):
                     errors.append('action must use an immutable commit SHA: '+name)
-            if re.search(r'(?m)^\s*pull_request_target\s*:', text):
+            if re.search(r'(?m)^[^#\n]*\bpull_request_target\b', text):
                 errors.append('privileged PR execution requires explicit security review: '+name)
     return errors
 

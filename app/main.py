@@ -162,7 +162,7 @@ class Handler(BaseHTTPRequestHandler):
                 champion = int(params.get('champion', ['0'])[0])
                 patch = params.get('patch', [''])[0]
                 if (not re.fullmatch(r'[0-9a-f]{24}', ref) or days not in (0, 7, 30, 90, 365)
-                        or champion < 0 or (patch and not re.fullmatch(r'[0-9]{1,4}\.[0-9]{1,4}', patch))):
+                        or champion < 0 or (patch and patch != 'unknown' and not re.fullmatch(r'[0-9]{1,4}\.[0-9]{1,4}', patch))):
                     return self.send(400, {'error': 'invalid_companion_filter'})
                 records = enrich_matches(self.server.store, self.server.store.all_matches())
                 record = companion_detail(records, ref, days=days, champion=champion, patch=patch,
@@ -173,7 +173,7 @@ class Handler(BaseHTTPRequestHandler):
                 days = int(params.get('days', ['0'])[0])
                 champion = int(params.get('champion', ['0'])[0])
                 patch = params.get('patch', [''])[0]
-                if days not in (0, 7, 30, 90, 365) or champion < 0 or (patch and not re.fullmatch(r'[0-9]{1,4}\.[0-9]{1,4}', patch)):
+                if days not in (0, 7, 30, 90, 365) or champion < 0 or (patch and patch != 'unknown' and not re.fullmatch(r'[0-9]{1,4}\.[0-9]{1,4}', patch)):
                     return self.send(400, {'error': 'invalid_filter'})
                 return self.send(200, overview(self.server.store, days, champion, patch))
             if url.path.startswith('/api/timeline/'):
