@@ -48,10 +48,14 @@ class DashboardApiTests(unittest.TestCase):
                 data = json.load(response)
             self.assertFalse(data['available'])
             self.assertEqual(data['reason'], 'timeline_not_collected')
-            for key, expected in [('HN1_999999', 404), ('bad-key', 400)]:
+            for key, expected in [('HN1_999999', 404), ('bad-key', 400), ('HN1_'+'0'*1000, 400)]:
                 with self.subTest(key=key), self.assertRaises(urllib.error.HTTPError) as caught:
                     urllib.request.urlopen(base + '/api/timeline/' + key)
                 self.assertEqual(caught.exception.code, expected)
+            for value in ('0'*1000+'.21', '16.'+'0'*1000):
+                with self.subTest(patch_length=len(value)), self.assertRaises(urllib.error.HTTPError) as caught:
+                    urllib.request.urlopen(base+'/api/overview?patch='+value)
+                self.assertEqual(caught.exception.code, 400)
         finally:
             server.shutdown()
             server.server_close()

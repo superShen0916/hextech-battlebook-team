@@ -117,6 +117,22 @@ class TeamBundleTests(unittest.TestCase):
 
 
 class SourceAndRuntimeTests(unittest.TestCase):
+    def test_export_includes_license_without_generating_owner_diaries(self):
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory); source = base/'project'; source.mkdir()
+            (source/'LICENSE').write_text('sample license', encoding='utf-8')
+            (source/'STATUS.md').write_text('owner runtime status', encoding='utf-8')
+            (source/'docs/history').mkdir(parents=True)
+            (source/'docs/history/CHANGELOG.md').write_text('local operations', encoding='utf-8')
+            inventory = b'LICENSE\0STATUS.md\0docs/history/CHANGELOG.md\0'
+            with patch('team_source.subprocess.check_output', return_value=inventory):
+                result = team_source.export(source, base/'export/source')
+            with zipfile.ZipFile(result['archive']) as archive:
+                self.assertEqual(archive.read('LICENSE'), b'sample license')
+                self.assertIn('AGENTS.md', archive.namelist())
+                self.assertNotIn('STATUS.md', archive.namelist())
+                self.assertNotIn('docs/history/CHANGELOG.md', archive.namelist())
+
     def test_first_build_creates_missing_backup_report_directory(self):
         import reconcile_archives
         with tempfile.TemporaryDirectory() as directory:
@@ -128,11 +144,12 @@ class SourceAndRuntimeTests(unittest.TestCase):
             self.assertEqual(json.loads((base/'backups/maintenance-reconcile.json').read_text()),[])
 
     def test_source_never_carries_local_history_identity_or_generated_scores(self):
-        for name in ('docs/HISTORY.md','docs/history/CHANGELOG.md','data/public-profiles.json',
+        for name in ('STATUS.md','docs/HISTORY.md','docs/history/CHANGELOG.md','data/public-profiles.json',
                      'haido/haido_scores_lp.json','.git/config','work/players-preview-20261022/_archive/old.py'):
             self.assertFalse(team_source.selected(name),name)
         self.assertTrue(team_source.selected('app/awards.py'))
         self.assertTrue(team_source.selected('docs/TEAM-GUIDE.md'))
+        self.assertTrue(team_source.selected('LICENSE'))
 
     def test_node_location_is_portable_but_version_is_still_pinned(self):
         with tempfile.TemporaryDirectory() as directory:

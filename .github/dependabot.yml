@@ -1,0 +1,28 @@
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
+    groups:
+      github-actions:
+        patterns: ['*']
+  - package-ecosystem: npm
+    directory: /work/players-preview-20261022
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      compatible-updates:
+        patterns: ['*']
+        update-types: [minor, patch]
+  - package-ecosystem: npm
+    directory: /tools/browser
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
+    groups:
+      compatible-updates:
+        patterns: ['*']
+        update-types: [minor, patch]

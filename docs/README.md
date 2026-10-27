@@ -1,15 +1,22 @@
-# 文档导航
+# 开发文档
 
-| 任务 | 文档 |
+| 主题 | 文档 |
 | --- | --- |
-| 新成员安装、本地开发、完整数据下载 | [TEAM-GUIDE](TEAM-GUIDE.md) |
-| PR合并、发布机接续、夜间数据包、未来机器人 | [TEAM-PUBLISHING](TEAM-PUBLISHING.md) |
-| 修改范围和固定验收命令 | [WORKFLOW](WORKFLOW.md) |
-| 领域模块、构建指纹、同步和产物身份 | [ARCHITECTURE](ARCHITECTURE.md) |
-| 唯一库、身份绑定、采集和防错 | [DATA-WORKFLOW](DATA-WORKFLOW.md) |
-| 当前海斗分5.1规则 | [评分规范](../haido/README.md) |
-| 功能保留 | [FEATURE-PARITY](FEATURE-PARITY.md) |
-| 成就、回顾分享、每周体验 | [ACHIEVEMENTS](ACHIEVEMENTS.md)、[RECAP-SHARING](RECAP-SHARING.md)、[WEEKLY-EXPERIENCE](WEEKLY-EXPERIENCE.md) |
-| 版本情报 | [VERSION-INTEL](VERSION-INTEL.md) |
+| 环境、安装、数据下载与本地运行 | [开发指南](TEAM-GUIDE.md) |
+| 提交规范与代码审阅 | [贡献指南](../CONTRIBUTING.md) |
+| AI开发约定 | [AGENTS.md](../AGENTS.md) |
+| 架构与模块边界 | [架构说明](ARCHITECTURE.md) |
+| CI、安全与AI评审 | [自动化规范](AUTOMATION.md) |
+| 构建、测试与验收 | [工作流](WORKFLOW.md) |
+| 数据、身份与采集 | [数据流程](DATA-WORKFLOW.md) |
+| 部署与数据Release | [发布指南](TEAM-PUBLISHING.md)、[站点部署](PUBLIC-SITE.md) |
+| 运行维护与恢复 | [维护指南](MAINTENANCE.md) |
+| 评分公式 | [海斗分](../haido/README.md) |
+| 产品兼容要求 | [功能清单](FEATURE-PARITY.md) |
+| 成就与十人战报 | [成就](ACHIEVEMENTS.md)、[十人战报](MATCH-REVIEW.md) |
+| 回顾、周报与分享 | [回顾分享](RECAP-SHARING.md)、[周报与氛围](WEEKLY-EXPERIENCE.md) |
+| 外部数据 | [版本情报](VERSION-INTEL.md)、[外部分数](HEXDATA-INTEGRATION.md) |
+| 访问统计 | [打点与统计](ANALYTICS.md) |
+| 许可证 | [MIT](../LICENSE)、[第三方许可](../THIRD-PARTY-NOTICES.md) |
 
-发布机专用的当前状态在根STATUS.md，维护及恢复操作见MAINTENANCE.md。旧讨论与旧Git历史已从日常资料中移除，只留本地恢复归档，不作为当前规范，也不带入团队源码。
+参考文档描述系统行为、接口和操作规范。问题讨论使用Issues，代码变更通过Pull Requests审阅；运行日志、验收回执和本机恢复资料不进入文档目录。

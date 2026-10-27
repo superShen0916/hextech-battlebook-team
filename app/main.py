@@ -34,6 +34,23 @@ def load_static():
     return result
 
 
+def icon_asset(relative):
+    """Select an existing icon; never construct a filesystem path from a URL."""
+    parts = relative.split('/')
+    if len(parts) != 2 or parts[0] not in ('champions', 'items', 'augments'):
+        return None
+    directory = APP / 'static' / 'icons'
+    folders = {name: directory/name for name in ('champions', 'items', 'augments')}
+    folder = folders[parts[0]]
+    if not folder.is_dir():
+        return None
+    for candidate in folder.iterdir():
+        if (candidate.name == parts[1] and not candidate.is_symlink() and
+                candidate.suffix in ('.png', '.webp', '.jpg', '.jpeg') and candidate.is_file()):
+            return candidate
+    return None
+
+
 def overview(store, days=0, champion=0, patch=''):
     account = store.account()
     records = enrich_matches(store, store.all_matches(days, champion, patch))
@@ -125,9 +142,8 @@ class Handler(BaseHTTPRequestHandler):
                 relative = urllib.parse.unquote(url.path[len('/assets/'):])
                 if not re.fullmatch(r'(champions|items|augments)/[A-Za-z0-9_-]+\.(png|webp|jpg|jpeg)', relative):
                     return self.send(404, {'error': 'asset_not_found'})
-                root = (APP / 'static' / 'icons').resolve()
-                asset = (root / relative).resolve()
-                if root not in asset.parents or not asset.is_file():
+                asset = icon_asset(relative)
+                if asset is None:
                     return self.send(404, {'error': 'asset_not_found'})
                 mime = {'.png': 'image/png', '.webp': 'image/webp', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg'}[asset.suffix]
                 return self.send(200, asset.read_bytes(), mime)
@@ -146,7 +162,7 @@ class Handler(BaseHTTPRequestHandler):
                 champion = int(params.get('champion', ['0'])[0])
                 patch = params.get('patch', [''])[0]
                 if (not re.fullmatch(r'[0-9a-f]{24}', ref) or days not in (0, 7, 30, 90, 365)
-                        or champion < 0 or (patch and not re.fullmatch(r'\d+\.\d+', patch))):
+                        or champion < 0 or (patch and not re.fullmatch(r'[0-9]{1,4}\.[0-9]{1,4}', patch))):
                     return self.send(400, {'error': 'invalid_companion_filter'})
                 records = enrich_matches(self.server.store, self.server.store.all_matches())
                 record = companion_detail(records, ref, days=days, champion=champion, patch=patch,
@@ -157,12 +173,12 @@ class Handler(BaseHTTPRequestHandler):
                 days = int(params.get('days', ['0'])[0])
                 champion = int(params.get('champion', ['0'])[0])
                 patch = params.get('patch', [''])[0]
-                if days not in (0, 7, 30, 90, 365) or champion < 0 or (patch and not re.fullmatch(r'\d+\.\d+', patch)):
+                if days not in (0, 7, 30, 90, 365) or champion < 0 or (patch and not re.fullmatch(r'[0-9]{1,4}\.[0-9]{1,4}', patch)):
                     return self.send(400, {'error': 'invalid_filter'})
                 return self.send(200, overview(self.server.store, days, champion, patch))
             if url.path.startswith('/api/timeline/'):
                 key = urllib.parse.unquote(url.path[len('/api/timeline/'):])
-                if not re.fullmatch(r'[A-Za-z0-9]+_\d+', key):
+                if not re.fullmatch(r'[A-Za-z0-9]{1,12}_[0-9]{1,32}', key):
                     return self.send(400, {'error': 'invalid_match'})
                 record = timeline_review(self.server.store, key)
                 return self.send(200 if record else 404, record or {'error': 'match_not_found'})

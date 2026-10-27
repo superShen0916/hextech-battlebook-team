@@ -12,11 +12,11 @@ COLLECTOR = 'work/gopher-pilot-20261021/scripts/'
 DOCS = {'README.md', 'TEAM-GUIDE.md', 'TEAM-PUBLISHING.md', 'ARCHITECTURE.md', 'MAINTENANCE.md',
         'FEATURE-PARITY.md', 'ACHIEVEMENTS.md', 'RECAP-SHARING.md', 'MATCH-REVIEW.md',
         'VERSION-INTEL.md', 'HEXDATA-INTEGRATION.md', 'DATA-WORKFLOW.md',
-        'PUBLIC-SITE.md', 'WORKFLOW.md', 'WEEKLY-EXPERIENCE.md'}
+        'PUBLIC-SITE.md', 'WORKFLOW.md', 'WEEKLY-EXPERIENCE.md', 'ANALYTICS.md', 'AUTOMATION.md'}
 COLLECT = {'sync_new_matches.py', 'list_teammates_pilot.py', 'collect_gopher_pilot.py',
            'collect_account_pilot.py', 'fix_all_attribution.py', 'check_all_attribution.py',
            'register_cached_player.py', 'owner_roster.py'}
-ROOT_FILES = {'README.md', 'CONTRIBUTING.md', '.gitignore', 'Team.cmd', 'Run-Python.cmd',
+ROOT_FILES = {'README.md', 'CONTRIBUTING.md', 'LICENSE', '.gitignore', '.coderabbit.yaml', 'Team.cmd', 'Run-Python.cmd',
               'Run-Node.cmd', 'Workflow.cmd', 'Start-Dashboard.cmd', 'Public-Site.cmd',
               'Share-Card.cmd', 'Sync-History.cmd', 'Update-Battlebook.cmd',
               'Update-Public-Site.cmd', 'Rebuild-Public-Site.cmd', 'Recover-Missing.cmd',
@@ -55,16 +55,39 @@ def selected(name):
     return False
 
 
-TEAM_AGENTS = '''# 团队维护约定
+TEAM_AGENTS = '''# AI开发约定
 
-先读 README.md、docs/TEAM-GUIDE.md、docs/TEAM-PUBLISHING.md 和 haido/README.md。
-源码只有一份，唯一运行库为 data/mayhem.sqlite。真实游戏数据从公开 Release 下载，不提交数据库、身份配置、评分生成物、令牌或发布凭据。
-修改使用 Workflow.cmd plan --files <文件>，完成后 prepare；prepare 仅在本机测试构建，不代表网站上线。
-正式站由原 WorkBuddy 应用发布；普通成员不要创建替代站或发布 GitHub Pages。发布者必须 ready → 原应用托管 → online。
-评分规则对所有玩家一致；不得按账号、昵称或目标排名单独加减分。冻结基准不是缓存，不得删除重建；算法与基准迁移需先经维护者审阅。
-保留全部历史、荣誉、雷达、十人战报、回顾和分享功能。禁止时间轴/逐帧采集。
-协作检出可以放任意目录；原发布机器项目和发布目录的绝对路径不得改变。
-新修改通过分支和 PR 合并。测试使用合成样本或共享数据，讨论算法时使用匿名案例；不把个人聊天讨论写入源码文档。
+## 开始工作
+
+阅读 README.md、docs/TEAM-GUIDE.md、docs/ARCHITECTURE.md 以及所改模块规范。修改前检查Git状态，只处理任务范围，不回滚他人改动。提交前说明行为变化和实际验证结果。
+
+## 运行与验证
+
+使用项目根的统一入口：Workflow.cmd plan --files <文件>，修改后prepare；正式发布前ready，托管原WorkBuddy应用后online。Python回归使用Run-Python.cmd -m unittest discover -s tests -q。依赖、Node版本和浏览器检查由现有工具链定义，不另建平行入口。
+
+## 数据边界
+
+唯一前端为work/players-preview-20261022，唯一运行库为data/mayhem.sqlite，路径由app/project_paths.py定义。完整开发数据从原仓库公开Release取得，不把数据库、身份配置、评分生成物、令牌或发布凭据提交Git。开发副本不得覆盖发布机数据或应用绑定。
+
+完整快照与网页摘要分开，禁止摘要覆盖完整输入。不采集逐帧时间轴。采集、构建与同步取得现有锁，不并发直跑底层脚本、不手删锁文件。采集失败不能冒充整链成功。
+
+## 评分与功能
+
+唯一海斗分入口为haido/rating_lp.py，单场表现来源为app/awards.py，完整规则见haido/README.md。所有玩家使用统一规则，不按账号、昵称或目标排名特判。冻结基准与标尺为持久状态，不当缓存删除；修改公式或迁移基准先获得维护者明确授权。
+
+保留完整个人历史、雷达及同类对比、装备与海克斯Top3、评语、队友、荣誉、搜索、十人战报、回顾、分享和成就。性能优化不得静默减少内容或用最近少量对局代替全历史。产品约束见docs/FEATURE-PARITY.md。
+
+## 部署与隐私
+
+正式站继续使用原WorkBuddy应用；本地构建或GitHub Release不代表上线。不创建替代正式站，不推GitHub Pages。发布流程见docs/TEAM-PUBLISHING.md。
+
+打点在开发环境默认关闭，配置只存本机。访客记录、真实设备编号、恢复包和本机配置不入库、不随战绩Release分发；分析访问情况的功能应保留。
+
+## 文档与许可
+
+文档只描述稳定行为、接口、架构、操作与约束，不写聊天摘要、个人评价、本机路径流水、验收记录或任务交接。运行证据放本机输出目录，变更讨论通过Issues和PR完成。同步更新受影响文档与链接。
+
+自有代码与文档采用MIT许可证；第三方游戏素材和数据保留原许可，见THIRD-PARTY-NOTICES.md。
 '''
 
 
@@ -85,11 +108,6 @@ def export(root=ROOT, destination=None):
             files[name] = path.read_bytes()
     files['AGENTS.md'] = TEAM_AGENTS.encode('utf-8')
     files['config/workspace.json'] = b'{"role":"collaborator"}\n'
-    files['STATUS.md'] = ('# 团队工作副本\n\n当前源码基线：海斗分5.1、单场表现v0.5。\n'
-        '本目录不是正式发布机；本地数据版本见 work/build/team-data.json，正式站见原 WorkBuddy 网址。\n'
-        '日常维护读 docs/TEAM-GUIDE.md，发布规则读 docs/TEAM-PUBLISHING.md。\n').encode('utf-8')
-    files['docs/history/CHANGELOG.md'] = ('# 团队变更记录\n\n'
-        '- 2026-10-27 | 基准版本 | 导入当前已发布5.1源码；不携带旧Git历史及本机讨论记录。\n').encode('utf-8')
     inventory = {}
     for name, content in files.items():
         path = destination/name

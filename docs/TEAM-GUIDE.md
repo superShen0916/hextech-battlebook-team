@@ -1,6 +1,6 @@
 # 在自己的电脑上维护战报馆
 
-仓库：`superShen0916/hextech-battlebook-team`，公开。克隆、改代码、提 PR 都不需要邀请；完整战绩数据在 Releases 里，`.\Team.cmd download` 会自动下载最新的数据包，所以任何人都能跑出和线上一致的完整档案。它以当前已发布5.1版本为新基准；旧聊天、评分试算、个人评价和原Git历史不带入。
+仓库：`superShen0916/hextech-battlebook-team`，公开。克隆、改代码、提 PR 都不需要邀请；完整战绩数据在 Releases 里，`.\Team.cmd download` 会自动下载最新的数据包，所以任何人都能跑出和线上一致的完整档案。
 
 ## 第一次运行（Windows / PowerShell）
 
@@ -21,7 +21,7 @@ Set-Location hextech-battlebook-team
 
 `setup` 在前端和浏览器工具目录分别执行锁定版本的 `npm ci --ignore-scripts`，不需要创建Junction。如果官方npm网络不畅，可执行 `Team.cmd setup --registry=https://registry.npmmirror.com`。Node可通过PATH寻找，但版本仍严格核对；特殊路径复制 `examples/runtime.local.json` 到 `config/runtime.local.json` 后填写，或设置环境变量 `BATTLEBOOK_NODE`。不要把自己的绝对路径提交。
 
-其他系统可通过 `python scripts/team.py ...` 调用同一入口；采集仍依赖Windows游戏客户端。本轮完整验证环境是Windows，不宣称已验证macOS/Linux。
+其他系统可通过 `python scripts/team.py ...` 调用同一入口；采集仍依赖Windows游戏客户端。受支持的完整开发环境为Windows；macOS/Linux可按同一Python入口适配，但采集依赖Windows客户端。
 
 ## 完整数据下载和更新
 
@@ -57,4 +57,4 @@ GitHub自动检查会从原仓库的公开Release安装完整数据，运行同�
 
 所有玩家使用 `app/awards.py` 与 `haido/rating_lp.py` 同一套规则；身份只用于关联记录和读取冻结历史基准，不能作为加减分条件。修改规则前先审阅，结果对全体适用。不要手改分数JSON、删除基准或为了某人的目标排名写例外。
 
-评分说明在 `haido/README.md`，模块职责在 `docs/ARCHITECTURE.md`。源码包不含本地历史讨论，不代表旧工作区从来没有这些记录。正式发布步骤见 `TEAM-PUBLISHING.md`。
+评分说明在 `haido/README.md`，模块职责在 `docs/ARCHITECTURE.md`。正式发布步骤见 `TEAM-PUBLISHING.md`。
