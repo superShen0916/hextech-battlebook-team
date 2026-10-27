@@ -148,7 +148,7 @@ if todo:
 update(True)
 
 for mid in todo:
-    if mid in covered:continue
+    if stopped or mid in covered:continue
     if args.limit and state['fetched']>=args.limit:break
     try:
         with store.connect() as db:
