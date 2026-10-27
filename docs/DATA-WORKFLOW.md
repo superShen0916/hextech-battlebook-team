@@ -46,3 +46,10 @@
 构建链为完整快照、十人明细、评分、注入、回顾/周报、成就、分片、数据门禁及前端。`work/build/snapshot.full.json` 是完整输入，`public/api/snapshot.json` 是网页摘要，二者不可互相替代。所有玩家保留完整已收录历史。
 
 恢复前停止写入，校验ZIP成员哈希、SQLite完整性和外键，同时恢复匹配的身份配置、基准与标尺。正常恢复目标仍是唯一运行库。网站回滚通过原发布目录和原应用执行，详见[维护指南](MAINTENANCE.md)。
+## 排位段位参考
+
+`data/ranked-bounds.json` 是排位下界的构建输入，由 `scripts/build_ranked_bounds.py` 从一次性调查产物 `outputs/sgp-ranked-research-20261028/combined-ranks-43.json` 折出，按上站名单换成稳定公开 ID，只写 `solo`/`flex` 两个队列的当前段位与已知下界，不含 PUUID、原始 SGP 响应和赛季编号。`scripts/inject_ranked_bounds.py` 在评分注入之后把它写进完整快照的 `rank` 字段，`split_snapshot` 的摘要保留同一份，`verify_release` 核对摘要与分片一致。
+
+口径是 `known_achieved_lower_bound`：排位攀登挑战 210004 与排位接口只能证明「至少达到过」，不保证覆盖账号全部年代，也不是完整生涯最高；未返回段位不等于从未排位。原值 4 在国服当前映射为翡翠、旧字典为铂金，调查表取保守下界（铂金），有明确排位字段时才补强为翡翠。
+
+段位只在网页上解释海斗分的口径：卡片悬浮框与档案页写明「海斗分不参考排位段位、不代表真实实力」，并给出该账号单双排历史至少达到的段位。段位不参与海斗分、MVP/ACE 与任何排序。重新调查后先跑 `build_ranked_bounds.py` 生成文件，再走标准 prepare；不要手改快照。

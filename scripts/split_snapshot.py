@@ -6,7 +6,7 @@ from pathlib import Path
 from snapshot_io import FULL, API, load_full, write_json
 
 RECENT_KEEP = 20
-KEEP = ('id', 'name', 'summary', 'rating', 'awards', 'verdict', 'hextech',
+KEEP = ('id', 'name', 'summary', 'rating', 'rank', 'awards', 'verdict', 'hextech',
         'preferences', 'highlights', 'history_scope', 'source_id', 'shared_games',
         'games', 'wins', 'win_rate', 'coverage')
 

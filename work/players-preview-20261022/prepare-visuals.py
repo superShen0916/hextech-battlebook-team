@@ -1,6 +1,7 @@
 """Read saved summaries, raw payloads and local databases; cache public Riot artwork.
 
-头像来自历史摘要文件与唯一项目数据库的participants.payload。
+头像来自历史摘要文件、source_payloads 完整对局原始数据与唯一项目数据库；
+participants.payload 为裁剪字段，只作兜底。
 """
 from pathlib import Path
 import json, urllib.request, concurrent.futures, hashlib, os, sqlite3, sys
@@ -73,6 +74,23 @@ for db in [DATABASE]:
                 continue
             obtain, name, icon = payload_fields(raw)
             observe(obtain, name, icon, started or 0)
+        # participants.payload 是归一化后的裁剪字段，不含 profileIcon；
+        # source_payloads 保留完整对局原始数据，是头像唯一可靠来源，
+        # 也覆盖采样快照之后新入队的玩家。
+        try:
+            rows = connection.execute(
+                "SELECT payload FROM source_payloads WHERE kind = 'summary'")
+        except sqlite3.OperationalError:
+            rows = ()
+        for (payload,) in rows:
+            try:
+                raw = json.loads(payload)
+            except ValueError:
+                continue
+            stamp = raw.get('gameStartTimestamp') or raw.get('gameCreation') or 0
+            for participant in raw.get('participants') or []:
+                obtain, name, icon = payload_fields(participant)
+                observe(obtain, name, icon, stamp)
     finally:
         connection.close()
 
@@ -86,7 +104,7 @@ def get(url):
         return response.read()
 
 
-version = '16.20.1'
+version = '16.21.1'
 try:
     champion_data = json.loads(get(f'https://ddragon.leagueoflegends.com/cdn/{version}/data/en_US/champion.json'))['data']
     champion_ids = {int(c['key']): c['id'] for c in champion_data.values()}

@@ -41,3 +41,19 @@
 
 /* 4.0: 基准与本周变化随当前档案显示，窄屏自然换行。 */
 .account-rating{flex-wrap:wrap}.account-rating .rating-week{white-space:normal;line-height:1.7}.rating-week>span{white-space:nowrap}
+/* 排位段位参考：只解释口径，不参与海斗分。2026-10-28 43 人上站时补。 */
+div.tile-haido{cursor:help}
+.rank-tip{position:fixed;z-index:120;width:min(292px,calc(100vw - 24px));padding:13px 15px;border:1px solid #b89c6655;border-radius:9px;background:#101a20f2;box-shadow:0 16px 38px #000a;color:#dbe6ee;font-size:11px;line-height:1.75;pointer-events:none;backdrop-filter:blur(6px)}
+.rank-tip-title{margin:0 0 6px;font-size:11px;letter-spacing:.12em;color:#e7c98b}
+.rank-tip-lede{margin:0;color:#c6d4dd}
+.rank-tip-lede b{color:#f2d79b;font-weight:600}
+.rank-tip-rows{list-style:none;margin:9px 0 0;padding:9px 0 0;border-top:1px solid #ffffff1f;display:grid;gap:6px}
+.rank-tip-rows li{display:grid;grid-template-columns:52px minmax(0,1fr);gap:8px;align-items:baseline}
+.rank-tip-rows span{color:#9ab0bd;font-size:10px;letter-spacing:.04em}
+.rank-tip-rows strong{color:#f0e6d2;font-weight:500}
+.rank-tip-rows strong>small{display:block;margin-top:2px;color:#9fb2be;font-size:10px;font-weight:400}
+.rank-tip-rows em{color:#94a7b4;font-style:normal}
+.rank-tip-note{margin:9px 0 0;padding-top:8px;border-top:1px solid #ffffff1f;color:#8fa4b1;font-size:10px;line-height:1.7}
+.account-rank{display:inline-flex;align-items:baseline;gap:6px;padding:3px 9px;border:1px solid #b89c663d;border-radius:999px;color:#e2d3ae;font-size:11px;white-space:nowrap}
+.account-rank small{color:#8fa4b1;font-size:10px}
+@media(max-width:700px){.archive-meta>.account-rank{width:auto;align-self:flex-start;white-space:normal;line-height:1.7}}
