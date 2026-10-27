@@ -34,7 +34,7 @@ ap=argparse.ArgumentParser(description='Collect match details for one pilot acco
 ap.add_argument('--account-key',required=True,help='registered account_key from the local database')
 ap.add_argument('--shard-index',type=int,default=0)
 ap.add_argument('--shard-count',type=int,default=1)
-ap.add_argument('--limit',type=int,default=0,help='stop after this many network fetches (0 = no limit)')
+ap.add_argument('--limit',type=int,default=0,help='stop after this many matches (0 = no limit); a page counts as one request')
 ap.add_argument('--interval',type=float,default=4.0)
 args=ap.parse_args()
 
@@ -129,7 +129,7 @@ if todo:
     def fetch_page(start,count):
         return parse_summary_page(read(summary_page_path(target,start,count)))
     try:
-        pages=cover_pages(todo,fetch_page)
+        pages=cover_pages(todo[:args.limit] if args.limit else todo,fetch_page)
         for mid,raw in pages['matched'].items():
             if stopped:break
             try:
