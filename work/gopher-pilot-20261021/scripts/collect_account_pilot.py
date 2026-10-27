@@ -25,7 +25,8 @@ from types import SimpleNamespace
 from datetime import datetime,timezone,timedelta
 ROOT=Path(__file__).resolve().parents[3]
 PILOT=ROOT/'work/gopher-pilot-20261021'
-from core import TencentSource,SourceError,NotStandardMayhem,normalize,scrub,utc_now
+from core import TencentSource,SourceError,NotStandardMayhem,normalize,scrub,utc_now,summary_page_path,parse_summary_page
+from batch_fetch import cover as cover_pages
 from store import Store
 
 def now():return datetime.now(timezone(timedelta(hours=8))).isoformat()
@@ -106,8 +107,32 @@ if args.shard_count>1:
 state['todo']=len(todo);update(True)
 print(json.dumps({'account':account['game_name'],'todo':len(todo),'already_stored':len(known)},ensure_ascii=False),flush=True)
 
+# Paged SUMMARY first: the whole queue usually sits inside page 0, so a tail of N
+# new matches costs one request instead of N (app/batch_fetch.py). Only queued
+# IDs are stored; the rest of the page is discarded. Any failure here is not
+# fatal - the per-match loop below is still the fallback.
+covered={}
+if todo:
+    def fetch_page(start,count):
+        return parse_summary_page(read(summary_page_path(target,start,count)))
+    try:
+        pages=cover_pages(todo,fetch_page)
+        for mid,raw in pages['matched'].items():
+            try:
+                put(raw,mid,'sgp_v1_summary_batch');state['fetched']+=1
+            except NotStandardMayhem as e:
+                store.discovery_status(key,mid,'skipped',e.code)
+            except SourceError as e:
+                store.discovery_status(key,mid,'failed',str(e))
+        covered=pages['matched']
+        state['batch']={'pages':pages['pages'],'matched':len(covered),'stop':pages['stop'],'missing':len(pages['missing'])}
+    except SourceError as e:
+        state['batch']={'error':e.code,'status':e.status,'fallback':'per_match'}
+update(True)
+
 stopped=None
 for mid in todo:
+    if mid in covered:continue
     if args.limit and state['fetched']>=args.limit:break
     try:
         with store.connect() as db:

@@ -10,7 +10,8 @@ from datetime import datetime,timezone,timedelta
 ROOT=Path(__file__).resolve().parents[3]
 HERE=Path(__file__).resolve().parent
 PILOT=ROOT/'work/gopher-pilot-20261021';PILOT.mkdir(parents=True,exist_ok=True)
-from core import TencentSource,SourceError,NotStandardMayhem,MATCH_ID,normalize,scrub,utc_now
+from core import TencentSource,SourceError,NotStandardMayhem,MATCH_ID,normalize,scrub,utc_now,summary_page_path,parse_summary_page
+from batch_fetch import cover as cover_pages
 from listing import classify_window,archive_index,iso_to_ms
 from store import Store
 
@@ -151,6 +152,28 @@ try:
         if shard_count>1:
             missing=[mid for i,mid in enumerate(missing) if i%shard_count==shard_index]
         if not missing:break
+        if round_index==1:
+            # Paged SUMMARY first: one request covers the newest ~50 missing
+            # matches, the per-match loop then only handles what fell outside
+            # that page (app/batch_fetch.py). Rate/permission stops stay fatal.
+            def fetch_page(start,count):
+                return parse_summary_page(read(summary_page_path(target,start,count),'pilot_summary_batch'))
+            try:
+                pages=cover_pages(missing,fetch_page)
+                for mid,raw in pages['matched'].items():
+                    try:
+                        put(raw,mid,'sgp_v1_summary_batch');state['new_remote_summaries']+=1
+                    except NotStandardMayhem as e:
+                        store.discovery_status(key,mid,'skipped',e.code)
+                    except SourceError as e:
+                        store.discovery_status(key,mid,'failed',str(e))
+                missing=[mid for mid in missing if mid not in pages['matched']]
+                state['batch']={'pages':pages['pages'],'matched':len(pages['matched']),'stop':pages['stop'],'missing':len(pages['missing'])}
+            except SourceError as e:
+                if e.code in fatal:raise
+                state['batch']={'error':e.code,'status':e.status,'fallback':'per_match'}
+            update()
+            if not missing:break
         state['round']=round_index;state['round_targets']=len(missing);update(True)
         if round_index>1:time.sleep(30)
         for mid in missing:
