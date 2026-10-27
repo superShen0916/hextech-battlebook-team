@@ -45,7 +45,7 @@
 
 ## 工作区状态
 
-`Team.cmd download`将开发副本登记为collaborator，文档prepare核对安装数据和冻结基准，不需要发布机状态卡。原发布机继续保留本机STATUS.md与docs/history/CHANGELOG.md，检查器按其中事实核对运行库、产物与恢复点；接收团队源码时保留这两份本机资料，不从源码仓库恢复或覆盖它们。它们被Git忽略，不随公开源码或战绩包分发。开发副本不能通过修改工作区角色代替正式托管验收。
+源码副本通过`config/workspace.json`登记为`collaborator`；`Team.cmd download`只下载并安装已校验的数据。文档prepare核对安装数据和冻结基准，不需要发布机状态卡。原发布机继续保留本机STATUS.md与docs/history/CHANGELOG.md，检查器按其中事实核对运行库、产物与恢复点；接收团队源码时保留这两份本机资料，不从源码仓库恢复或覆盖它们。它们被Git忽略，不随公开源码或战绩包分发。开发副本不能通过修改工作区角色代替正式托管验收。
 
 ## 回执与失败恢复
 
