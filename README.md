@@ -2,16 +2,26 @@
 
 [![CI](https://github.com/superShen0916/hextech-battlebook-team/actions/workflows/checks.yml/badge.svg)](https://github.com/superShen0916/hextech-battlebook-team/actions/workflows/checks.yml) [![MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-朋友共同维护的海克斯大乱斗战绩站：玩家大厅、完整个人档案、六维雷达、十人战报、海斗分、搭档荣誉、当晚和多人回顾、分享图、成就与版本情报。
+面向《英雄联盟》海克斯大乱斗的战绩分析与对局回顾工具。通过个人档案、英雄数据、十人战报和多人回顾，查看每场对局的表现，追踪长期变化，也留住一起开黑的高光时刻。
 
-- **本仓库**：[superShen0916/hextech-battlebook-team](https://github.com/superShen0916/hextech-battlebook-team)。公开仓库，任何人不经邀请即可克隆、阅读、改代码、提 Issue 或 PR。
-- **战绩数据**：完整运行库与逐局战绩不随代码入库，放在 [Releases](https://github.com/superShen0916/hextech-battlebook-team/releases) 的数据包里，`.\Team.cmd download` 会自动取最新包。想本地跑出完整页面，就按下面的步骤来。
-- **正式网站**：[WorkBuddy 海克斯战报馆](https://hextech-battlebook.app.workbuddy.host/?sharecode=7ZFAIH5YHV)。GitHub负责协作和数据下载，网页继续在原WorkBuddy应用托管。
-- **新成员先读**：[本地运行与完整数据下载](docs/TEAM-GUIDE.md)、[团队维护及发布流程](docs/TEAM-PUBLISHING.md)、[贡献约定](CONTRIBUTING.md)。
+[在线体验](https://hextech-battlebook.app.workbuddy.host/?sharecode=7ZFAIH5YHV) · [快速开始](#快速开始) · [开发文档](docs/README.md) · [贡献指南](CONTRIBUTING.md)
 
-## 本地启动（Windows / PowerShell）
+## 主要功能
 
-安装Git、Python 3.10+、Node 22.23.3（含npm）、GitHub CLI以及Chrome/Edge，然后：
+- **个人档案**：完整对局历史、胜率与英雄表现，结合六维雷达、同类对比、装备和海克斯偏好，呈现不同玩家的打法特点。
+- **十人战报**：查看双方阵容、装备、海克斯、关键数据及单场表现，回看一局里每个人的发挥。
+- **海斗分与周报**：结合胜负、单场表现和多杀奖励，展示长期积分、每周变化与周榜。计算口径见[评分规则](haido/README.md)。
+- **队友与多人回顾**：统计同队对局、搭档表现和共同荣誉，按当晚或多人交集整理开黑回顾。
+- **成就与分享**：汇集个人成就、荣誉和高光，生成战报与回顾分享图。
+- **版本与检索**：查看版本情报，按英雄、日期、队友等条件筛选战绩，支持桌面和手机浏览。
+
+所有统计基于已收录的海克斯大乱斗对局。
+
+## 快速开始
+
+支持的完整开发环境为 Windows。准备 Git、Python 3.10+、Node **22.23.3**（含 npm）、GitHub CLI，以及 Chrome 或 Edge。
+
+在 PowerShell 中运行：
 
 ```powershell
 gh auth login
@@ -23,32 +33,43 @@ Set-Location hextech-battlebook-team
 .\Start-Dashboard.cmd
 ```
 
-浏览器打开 `http://127.0.0.1:5180/`。完整数据包包含所有共享战绩、匹配配置、冻结评分状态、完整快照与页面资源，不是几条演示数据。开发不需要LOL客户端或WorkBuddy；只有采集和正式托管需要发布机。
+打开 `http://127.0.0.1:5180/`。首次运行会下载开发数据并完成构建，需要几分钟；后续构建按内容复用。日常开发无需启动游戏客户端或安装 WorkBuddy。
 
-更新开发数据：先更新main源码，再运行 `Team.cmd download --replace`。更新前关闭数据库连接；命令先校验完整性并备份被覆盖文件。网络镜像、Node特殊路径、指定Release及手动安装见TEAM-GUIDE。
+依赖镜像、手动安装数据包及环境配置见[本地开发指南](docs/TEAM-GUIDE.md)。
 
-## 维护流程
+## 开发数据
 
-修改前 `Workflow.cmd plan --files <文件>`，完成后 `prepare`，通过分支和PR合并。正式发布由发布机执行 `ready → WorkBuddy原应用托管 → online`；本地构建和GitHub Release均不代表网站上线。自动检查、安全扫描与AI评审见[自动化规范](docs/AUTOMATION.md)。正式发布仍由维护者控制。
+源码与战绩数据分开维护。`Team.cmd download` 从 [Releases](https://github.com/superShen0916/hextech-battlebook-team/releases) 获取匹配的数据包，包含运行数据库、名单配置、冻结评分状态、完整快照与页面资源，用于本地运行和验证功能。
 
-Python回归：`Run-Python.cmd -m unittest discover -s tests -q`。prepare统一运行适用的Python回归、TypeScript、7项前端检查、数据/评分/隐私门禁及1440/390/320浏览器检查，详见[WORKFLOW](docs/WORKFLOW.md)。不另写平行的评分、构建或发布实现。
+更新源码后，可在关闭本地服务和数据库连接的情况下运行：
 
-## 目录与规则
+```powershell
+.\Team.cmd download --replace
+```
 
-| 目录 | 职责 |
+下载与安装会校验数据完整性，并备份被替换的文件。数据版本记录在 `work/build/team-data.json`，详细步骤见[数据下载与更新](docs/TEAM-GUIDE.md#完整数据下载和更新)。
+
+## 参与开发
+
+前端使用 React、TypeScript 和 Vite，统计、采集与构建使用 Python，运行数据存储于 SQLite。
+
+| 路径 | 内容 |
 | --- | --- |
-| app/ | 领域统计、存储、单场表现与公开投影 |
-| haido/rating_lp.py | 唯一海斗分入口，规则见[5.1规范](haido/README.md) |
-| scripts/ | 构建、校验、同步、团队数据分发与源码导出 |
-| work/players-preview-20261022/ | 唯一React/TypeScript/Vite前端，保留历史路径避免现站绑定失效 |
-| work/gopher-pilot-20261021/scripts/ | 当前采集入口及依赖 |
-| data/ | 唯一数据库、身份配置、排除规则和冻结状态；从Release数据包取得，不提交Git |
-| examples/ | 不带真实身份的配置格式 |
-| tests/、tools/browser/ | 回归与浏览器验收 |
-| outputs/、backups/ | 本机产物与恢复点，不上传源码仓库 |
+| `work/players-preview-20261022/` | 前端页面与交互 |
+| `app/` | 统计、存储、个人表现与对局接口 |
+| `haido/` | 海斗分计算与评分规范 |
+| `scripts/` | 数据处理、构建、校验与同步 |
+| `tests/`、`tools/browser/` | 自动化测试与浏览器验收 |
 
-所有玩家使用统一规则；个人基准来自历史公式计算并冻结，不得按账号或目标排名加减分。周分、基准和逐局说明共用唯一评分来源。不得删除基准重建，不采集逐帧时间轴，不减少完整个人内容。
+修改前查看检查范围，完成后运行对应验收：
 
-项目自有代码与文档采用 [MIT License](LICENSE)。游戏素材、第三方数据和依赖保留各自许可，见[第三方说明](THIRD-PARTY-NOTICES.md)。
+```powershell
+.\Workflow.cmd plan --files <修改的文件>
+.\Workflow.cmd prepare --files <修改的文件>
+```
 
-开发环境的数据版本见 `work/build/team-data.json`。文档入口见[开发文档](docs/README.md)，AI开发助手先读[AGENTS.md](AGENTS.md)。
+通过分支和 PR 提交修改。开发约定见[贡献指南](CONTRIBUTING.md)，AI 编程助手先读 [AGENTS.md](AGENTS.md)。架构、自动化检查和正式部署分别见[架构说明](docs/ARCHITECTURE.md)、[自动化规范](docs/AUTOMATION.md)和[发布指南](docs/TEAM-PUBLISHING.md)。
+
+## 许可证
+
+项目自有代码与文档采用 [MIT License](LICENSE)。游戏素材、第三方数据和依赖遵循各自许可，见[第三方说明](THIRD-PARTY-NOTICES.md)。
