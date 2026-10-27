@@ -32,7 +32,8 @@ class RepositoryQualityTests(unittest.TestCase):
                 names.append(name)
             errors = inspect(root, names)
             self.assertTrue(any('local data' in e for e in errors))
-            self.assertTrue(any('GitHub token' in e for e in errors))
+            self.assertTrue(any('credential marker' in e for e in errors))
+            self.assertNotIn('ghp_'+'A'*36, '\n'.join(errors))
 
     def test_mutable_actions_and_privileged_pull_requests_are_rejected(self):
         with tempfile.TemporaryDirectory() as directory:

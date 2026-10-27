@@ -7,11 +7,11 @@ import subprocess
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SECRETS = {
-    'GitHub token': re.compile(rb'(?:gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{50,})'),
-    'private key': re.compile(rb'-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----'),
-    'cloud secret': re.compile(rb'AKID[A-Za-z0-9]{28,}'),
-}
+CREDENTIAL_PATTERNS = (
+    re.compile(rb'(?:gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{50,})'),
+    re.compile(rb'-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----'),
+    re.compile(rb'AKID[A-Za-z0-9]{28,}'),
+)
 FORBIDDEN_PARTS = {'.git', 'node_modules', '__pycache__', 'backups', 'outputs', '_archive'}
 
 
@@ -42,9 +42,11 @@ def inspect(root, names):
             errors.append('local data or operations file tracked: '+name)
             continue
         raw = path.read_bytes()
-        for kind, pattern in SECRETS.items():
+        for pattern in CREDENTIAL_PATTERNS:
             if pattern.search(raw):
-                errors.append(kind+' found: '+name)
+                # Diagnostics identify only the file, never a matched value.
+                errors.append('credential marker found: '+name)
+                break
         if relative.suffix == '.json':
             try:
                 json.loads(raw.decode('utf-8-sig'))
