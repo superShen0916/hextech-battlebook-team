@@ -25,7 +25,8 @@ from types import SimpleNamespace
 from datetime import datetime,timezone,timedelta
 ROOT=Path(__file__).resolve().parents[3]
 PILOT=ROOT/'work/gopher-pilot-20261021'
-from core import TencentSource,SourceError,NotStandardMayhem,normalize,scrub,utc_now
+from core import TencentSource,SourceError,NotStandardMayhem,normalize,scrub,utc_now,summary_page_path,parse_summary_page
+from batch_fetch import cover as cover_pages
 from store import Store
 
 def now():return datetime.now(timezone(timedelta(hours=8))).isoformat()
@@ -33,9 +34,10 @@ ap=argparse.ArgumentParser(description='Collect match details for one pilot acco
 ap.add_argument('--account-key',required=True,help='registered account_key from the local database')
 ap.add_argument('--shard-index',type=int,default=0)
 ap.add_argument('--shard-count',type=int,default=1)
-ap.add_argument('--limit',type=int,default=0,help='stop after this many network fetches (0 = no limit)')
+ap.add_argument('--limit',type=int,default=0,help='stop after this many matches (0 = no limit); a page counts as one request')
 ap.add_argument('--interval',type=float,default=4.0)
 args=ap.parse_args()
+if args.limit<0:ap.error('--limit must be >= 0')
 
 store=Store(DATA,account_key=args.account_key)
 with store.connect() as db:
@@ -106,8 +108,47 @@ if args.shard_count>1:
 state['todo']=len(todo);update(True)
 print(json.dumps({'account':account['game_name'],'todo':len(todo),'already_stored':len(known)},ensure_ascii=False),flush=True)
 
+# Paged SUMMARY first: the queue usually sits inside the newest page, so a tail
+# of N new matches costs one page request instead of N (app/batch_fetch.py).
+# Only queued IDs are stored; the rest of the page is discarded. A page failure
+# falls back to per-match, except for the statuses that stop the whole batch.
 stopped=None
+covered={}
+
+def store_from_page(mid,raw):
+    """One write per match; a lost write lock must cost a retry, not the run."""
+    for db_attempt in range(6):
+        try:
+            put(raw,mid,'sgp_v1_summary_batch');return
+        except sqlite3.Error as e:
+            state['db_retries']=state.get('db_retries',0)+1
+            state['last_db_error']=type(e).__name__+': '+str(e)[:200]
+            if db_attempt==5:raise
+            time.sleep(2*(db_attempt+1))
+
+if todo:
+    def fetch_page(start,count):
+        return parse_summary_page(read(summary_page_path(target,start,count)))
+    try:
+        pages=cover_pages(todo[:args.limit] if args.limit else todo,fetch_page)
+        for mid,raw in pages['matched'].items():
+            if stopped:break
+            try:
+                store_from_page(mid,raw);state['fetched']+=1
+            except NotStandardMayhem as e:
+                store.discovery_status(key,mid,'skipped',e.code)
+            except SourceError as e:
+                store.discovery_status(key,mid,'failed',str(e))
+        covered=pages['matched']
+        state['batch']={'pages':pages['pages'],'matched':len(covered),'stop':pages['stop'],'missing':len(pages['missing'])}
+    except SourceError as e:
+        state['batch']={'error':e.code,'status':e.status,'fallback':'per_match'}
+        if e.status in FATAL_STATUS or e.code in ('login_token_unavailable','local_connection_failed','local_request_failed'):
+            stopped='%s/%s'%(e.code,e.status);state['stopped_reason']=stopped
+update(True)
+
 for mid in todo:
+    if mid in covered:continue
     if args.limit and state['fetched']>=args.limit:break
     try:
         with store.connect() as db:

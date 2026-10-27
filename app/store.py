@@ -6,8 +6,15 @@ import hashlib
 import json
 from pathlib import Path
 import sqlite3
+import time
 from core import SourceError, scrub, utc_now
 from match_policy import apply_policy
+
+
+def _lock_conflict(error):
+    """SQLite reports contention as 'locked'/'busy'; any other error is not retryable."""
+    text = str(error).lower()
+    return 'locked' in text or 'busy' in text
 
 
 class Store:
@@ -102,9 +109,21 @@ class Store:
                 ON CONFLICT(account_key,match_key) DO NOTHING''', [(account_key, mid, utc_now()) for mid in ids])
 
     def discovery_status(self, account_key, match_key, status, error=None):
-        with self.connect() as db:
-            db.execute('''UPDATE discovered SET status=?,attempts=attempts+1,last_error=?,updated_at=?
-                WHERE account_key=? AND match_key=?''', (status, error, utc_now(), account_key, match_key))
+        """Record a discovery outcome; a lost write lock must not end a collector run.
+
+        Only lock contention is retried: a read-only database, a full disk or a
+        missing table must surface immediately instead of waiting out the backoff.
+        """
+        for attempt in range(6):
+            try:
+                with self.connect() as db:
+                    db.execute('''UPDATE discovered SET status=?,attempts=attempts+1,last_error=?,updated_at=?
+                        WHERE account_key=? AND match_key=?''', (status, error, utc_now(), account_key, match_key))
+                return
+            except sqlite3.Error as error_:
+                if attempt == 5 or not _lock_conflict(error_):
+                    raise
+                time.sleep(2 * (attempt + 1))
 
     def has(self, account_key, match_key):
         with self.connect() as db:

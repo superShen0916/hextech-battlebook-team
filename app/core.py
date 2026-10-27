@@ -14,6 +14,7 @@ import lcu_probe
 LOCAL_ROUTES = {'/lol-summoner/v1/current-summoner', '/lol-chat/v1/me',
                 '/client-config/v2/namespace/lol.client_settings', '/entitlements/v1/token'}
 MATCH_ID = re.compile(r'[A-Z0-9]+_[0-9]+\Z')
+BATCH_LIMIT = 100
 
 
 class SourceError(Exception):
@@ -183,6 +184,47 @@ class TencentSource:
         if not isinstance(result, dict):
             raise SourceError('unexpected_match_schema')
         return result
+
+    def summary_page(self, puuid, start, count, tag='q_2400'):
+        """One page of full match summaries for any puuid, newest first."""
+        result = self.get(summary_page_path(puuid, start, count, tag), timeout=60)
+        return parse_summary_page(result)
+
+
+def summary_page_path(puuid, start, count, tag='q_2400'):
+    """Route for the paged SUMMARY listing; same payload as summary(match_id)."""
+    if not isinstance(puuid, str) or not puuid or '\\' in puuid or '/' in puuid:
+        raise SourceError('invalid_puuid')
+    if not isinstance(start, int) or isinstance(start, bool) or start < 0:
+        raise SourceError('invalid_batch_window')
+    if not isinstance(count, int) or isinstance(count, bool) or not 1 <= count <= BATCH_LIMIT:
+        raise SourceError('invalid_batch_window')
+    if not isinstance(tag, str) or not re.fullmatch(r'q_[0-9]+', tag):
+        raise SourceError('invalid_batch_queue')
+    query = urllib.parse.urlencode({'startIndex': start, 'count': count, 'tag': tag})
+    return f'/match-history-query/v1/products/lol/player/{urllib.parse.quote(puuid, safe="")}/SUMMARY?{query}'
+
+
+def parse_summary_page(result):
+    """[(match_id, raw_summary), ...] from a paged SUMMARY response.
+
+    Upstream wraps each match as {"metadata": ..., "json": <summary>}; the inner
+    object is byte-for-byte the shape of the single-match endpoint, so every
+    downstream validator (normalize) can treat both sources identically.
+    """
+    games = result.get('games') if isinstance(result, dict) else None
+    if not isinstance(games, list):
+        raise SourceError('unexpected_history_schema')
+    page = []
+    for item in games:
+        raw = item.get('json') if isinstance(item, dict) else None
+        if not isinstance(raw, dict):
+            raise SourceError('unexpected_history_schema')
+        match_id = f'{raw.get("platformId")}_{raw.get("gameId")}'
+        if not MATCH_ID.fullmatch(match_id):
+            raise SourceError('unexpected_history_schema')
+        page.append((match_id, raw))
+    return page
 
 
 def normalize(raw, self_puuid, expected_id=None):
