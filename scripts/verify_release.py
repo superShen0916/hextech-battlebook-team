@@ -111,7 +111,8 @@ def verify(api=API, full=FULL, write_manifest=False, expected_week_ms=None):
         assert rating['base'] == round(frozen['players'][p['id']]['base'], 1), 'unfrozen_rating_base:' + p['id']
         assert p.get('rating') == rating == shard.get('rating'), 'mixed_rating_projection:' + p['id']
         rank = p.get('rank')
-        assert rank == shard.get('rank'), 'mixed_rank_projection:' + p['id']
+        # 摘要、分片和完整快照三处必须是同一份段位，任一处漂移都算投影错位。
+        assert rank == expected.get('rank') == shard.get('rank'), 'mixed_rank_projection:' + p['id']
         if rank is not None:
             assert set(rank) <= {'checked_at', 'solo', 'flex'}, 'unsafe_rank_fields:' + p['id']
             for queue in ('solo', 'flex'):

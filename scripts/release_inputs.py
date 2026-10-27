@@ -138,8 +138,10 @@ def validation_code_inputs(root, front, node_version):
              tree_hash(root / 'config'),
              tree_hash(root / 'work/gopher-pilot-20261021/scripts', selected),
              tree_hash(root / 'data/raw', lambda p: p.suffix == '.json'),
+             # 只有排位下界是本地调研产物：缺文件记 'missing'，其余必需配置缺失要立刻报错。
              [((name, file_hash(root / 'data' / name)) if (root / 'data' / name).is_file()
-               else (name, 'missing')) for name in
+               else (name, 'missing')) if name == 'ranked-bounds.json'
+              else (name, file_hash(root / 'data' / name)) for name in
               ('haido-baseline-v4.json', 'public-profiles.json', 'ranked-bounds.json',
                'collection.json', 'stat-exclusions.json')],
              file_hash(root / 'data/hexdata-ratings.json') if (root / 'data/hexdata-ratings.json').exists() else 'missing-hexdata',

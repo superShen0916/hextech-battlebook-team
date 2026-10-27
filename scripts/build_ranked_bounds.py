@@ -58,6 +58,15 @@ def build(source=SOURCE, profiles=PROFILES, target=TARGET, checked_at=None):
                          '未返回段位不等于从未排位。',
                'players': dict(sorted(players.items()))}
     target = Path(target)
+    if target.exists():
+        # 只差时间戳不算变化：沿用原 generated_at，避免每次重算都改产物指纹。
+        try:
+            existing = json.loads(target.read_text(encoding='utf-8'))
+        except (OSError, ValueError):
+            existing = None
+        if (isinstance(existing, dict) and
+                {**payload, 'generated_at': None} == {**existing, 'generated_at': None}):
+            payload['generated_at'] = existing.get('generated_at') or now
     encoded = json.dumps(payload, ensure_ascii=False, indent=1, sort_keys=True) + '\n'
     if not target.exists() or target.read_text(encoding='utf-8') != encoded:
         target.write_text(encoded, encoding='utf-8')

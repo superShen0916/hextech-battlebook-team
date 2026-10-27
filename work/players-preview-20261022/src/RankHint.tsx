@@ -79,7 +79,9 @@ export default function RankHint({rank,className,children}:{rank?:Rank|null;clas
     // 优先放到卡片下方；下方放不下且上方更宽裕时才上移，尽量不盖住正在看的卡片。
     return below>=height||above<height?{left,top:anchor.bottom+GAP}:{left,bottom:window.innerHeight-anchor.top+GAP};
   })():null;
-  return <div ref={trigger} className={className} onMouseEnter={open} onMouseLeave={close} title={rankPlainText(rank)}>
+  // 不要挂 title：桌面端会同时弹出原生提示条，和自定义悬浮框叠在一起。
+  // 读屏和触屏改用 aria-label，文案与悬浮框一致。
+  return <div ref={trigger} className={className} role="group" aria-label={rankPlainText(rank)} onMouseEnter={open} onMouseLeave={close}>
     {children}
     {anchor&&style&&createPortal(<div ref={tip} className="rank-tip" role="tooltip" style={style}>
       <p className="rank-tip-title">海斗分 ≠ 排位实力</p>
