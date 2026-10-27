@@ -9,8 +9,9 @@ SGP serves the same per-match payload two ways:
 Both bodies carry the identical match object, so a collector may take the whole
 queue from pages and keep the single-match route only as the fallback. Page order
 is listing order (newest first) inside the same bounded window the listing
-endpoint exposes (app/listing.py), so anything a page does not contain is outside
-the window and must not be paged after.
+endpoint exposes (app/listing.py): a short or empty page marks the end of that
+window, while a full page that misses an ID only means the ID sits further down,
+so paging continues until the window ends or the page ceiling is reached.
 
 Upstream refuses the paged route when the whole edge is saturated; collectors must
 treat that as "retry later", not as "the route does not exist".
