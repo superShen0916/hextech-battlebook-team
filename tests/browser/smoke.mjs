@@ -62,6 +62,9 @@ function staticServer(base) {
 }
 const check = value => {results.checks.push(value); console.log('PASS', value);};
 const number = value => Number(value.replaceAll(',', '').replaceAll('+', ''));
+const beijingStamp=ms=>{const d=new Date(ms+8*3600*1000),p2=n=>String(n).padStart(2,'0');
+  return `${d.getUTCFullYear()}/${p2(d.getUTCMonth()+1)}/${p2(d.getUTCDate())} ${p2(d.getUTCHours())}:${p2(d.getUTCMinutes())}`;};
+
 
 try {
   browser = await launch();
@@ -247,11 +250,17 @@ try {
       assert.ok(index >= 0);
       for (const width of [1440,390,320]) {
         await page.setViewportSize({width,height:1000});
+        // 档案页会先渲染默认玩家的列表、再换成链接里的玩家；等这张表真的换成本玩家最新一场再翻页，
+        // 否则按明细下标翻页会翻在过渡数据上（2026-10-31 采集后实测偶发）。
+        const newest = beijingStamp(pentaFull.recent[0].started_ms);
         await page.goto(url('/', {player:pentaProfile.id}), {waitUntil:'domcontentloaded'});
-        await page.locator('.match-card-table tbody tr').first().waitFor();
-        for (let step = 0; step < Math.floor(index/10); step++)
+        await page.locator('.match-card-table tbody tr').filter({hasText:newest}).first().waitFor({timeout:20000});
+        // 每页条数随视口变化（桌面 20、窄屏 10），按实际渲染行数翻页，不能写死 10。
+        const perPage = await page.locator('.match-card-table tbody tr').count();
+        assert.ok(perPage > 0);
+        for (let step = 0; step < Math.floor(index/perPage); step++)
           await page.getByRole('button',{name:'下一页',exact:true}).click();
-        const row = page.locator('.match-card-table tbody tr').nth(index%10);
+        const row = page.locator('.match-card-table tbody tr').nth(index%perPage);
         const badge = row.locator('.penta-flag');
         await badge.waitFor();
         assert.equal(number((await badge.innerText()).replace('五杀奖励','')),pentaFull.recent[index].rating_penta_bonus);

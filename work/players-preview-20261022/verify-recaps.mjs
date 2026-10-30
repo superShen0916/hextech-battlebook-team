@@ -11,7 +11,7 @@ assert.deepEqual(hallRanking(board,'weekly').map(r=>r.id),['a','b','c','d']);
 assert.deepEqual(hallRanking(board,'total').map(r=>hallPlace(r,'total')),[1,1,3,null]);
 assert.deepEqual(board.map(r=>r.id),['a','b','c','d']);
 console.log('PASS: independent weekly/total order, provisional score ordering, published tie ranks, unrated last, immutable input.');
-const {commonGames,summarizeGames,loadRecap,clearRecapCache,recapCast,recapCastGroup}=await import(recapUrl);
+const {commonGames,summarizeGames,loadRecap,clearRecapCache,recapCast,castPool}=await import(recapUrl);
 const people=ids=>ids.map(profile_id=>({profile_id,kills:2,deaths:1,assists:3,damage:100,heal:0}));
 const games=[{id:'one',started_ms:1,win:true,members:people(['a','b','c'])},{id:'two',started_ms:2,win:false,members:people(['a','b'])},{id:'three',started_ms:3,win:true,members:people(['c','d'])}];
 assert.equal(commonGames(games,['a','b']).length,2);
@@ -51,15 +51,25 @@ const cast=recapCast(castGames,['a','b','c']);
 assert.deepEqual(cast.roles.map(r=>r.title),['上等马','中等马','下等马 · 甲级战犯']);
 assert.equal(cast.roles[0].ace,4);
 assert.equal(recapCast(castGames.slice(0,2),['a','b','c']).roles.length,0);
-assert.equal(recapCast(castGames.map(g=>({...g,win:true})),['a','b','c']).roles.at(-1).title,'下等马');
+assert.equal(recapCast(castGames.map(g=>({...g,win:true})),['a','b','c']).roles.at(-1).title,'稳住位');
+assert.equal(recapCast(castGames.map(g=>({...g,win:true})),['a','b','c']).roles.at(-1).tier,'steady');
 assert.equal(recapCast(castGames.map(g=>({...g,members:g.members.map(p=>({...p,performance:{score:60}}))})),['a','b','c']).roles.length,0);
 assert.deepEqual(recapCast(castGames.map(g=>({...g,members:g.members.map(p=>({...p,performance:{score:p.profile_id==='c'?30:75}}))})),['a','b','c']).roles.map(r=>r.title),['上等马','上等马','下等马 · 甲级战犯']);
-assert.deepEqual(recapCastGroup(castGames,['a']),['a','b','c']);
+assert.deepEqual(castPool(castGames,['a']),['a','b','c']);
 const mixed=[...castGames,{id:'solo',started_ms:99,win:false,members:[{profile_id:'a',performance:{score:0}},{profile_id:'d',performance:{score:100}}]}];
-assert.equal(recapCast(mixed,recapCastGroup(mixed,['a'])).roles[0].average,75);
+assert.deepEqual(castPool(mixed,['a']),['a','b','c']);
+assert.equal(recapCast(mixed,castPool(mixed,['a'])).roles[0].games,6);
+assert.equal(recapCast(mixed,castPool(mixed,['a'])).roles[0].average,62.5);
+const extra=Array.from({length:6},(_,i)=>({id:'only'+i,started_ms:50+i,win:true,members:[{profile_id:'a',performance:{score:70}},{profile_id:'b',performance:{score:70}}]}));
+const thin=recapCast([...castGames,...extra],['a','b','c']);
+assert.equal(thin.roles.length,3);
+assert.equal(thin.roles.filter(r=>r.thin).length,1);
+assert.equal(thin.roles.at(-1).id,'c');
+assert.equal(thin.roles.at(-1).title,'轮换位');
+assert.equal(thin.roles.at(-1).tier,'thin');
 assert.equal(recapCastShareSafe().cast.roles[0].title,'上等马');
 function recapCastShareSafe(){return recapShareModel(castGames,{mode:'team',selected:['a','b','c'],period:'all'},{a:'A',b:'B',c:'C'});}
-console.log('PASS: recap cast needs 3 common team games, preserves v0.5 scores, avoids mixed schedules/ties, and uses conditional roast in share model.');
+console.log('PASS: recap cast covers every team game of the scope, keeps own-sample averages, marks short samples as rotation instead of ranks, never roasts a winning crew, and uses the same model in the share image.');
 
 const realFetch=globalThis.fetch;
 try{

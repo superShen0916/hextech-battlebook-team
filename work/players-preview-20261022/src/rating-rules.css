@@ -8,3 +8,5 @@
 /* Keep math scripts on their true baseline instead of treating subscripts as flex items. */
 .rules-equation:not(.main-equation){display:block;text-align:center}.rules-equation sub{vertical-align:sub;line-height:0;align-self:auto}.rules-equation:not(.main-equation)>i{margin:0 8px}.math-bracket{display:inline}.math-case{vertical-align:middle}.math-case>span{border:0;padding:0;font:inherit}.math-case>span:last-child{font:12px/1.9 "Microsoft YaHei",sans-serif;border-left:2px solid #bdb299;padding-left:12px}
 @media(max-width:700px){.math-case>span:last-child{font-size:10px}}
+/* 320 窄屏：分项条改成两列，去掉 + / → 连接符，避免撑破评分规则弹窗。 */
+@media(max-width:380px){.component-values{display:grid;grid-template-columns:1fr 1fr;gap:14px 10px}.component-values>i{display:none}.component-values b{font-size:21px}}
