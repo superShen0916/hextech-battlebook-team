@@ -6,6 +6,15 @@ export type IntelIndex = {default_patch:string;datasets:{patch:string;snapshot_a
 export type IntelOverview = {patch:string;snapshot_at:string;license:string;source_url:string;regions:string[];window:{start:string;end_exclusive:string};matches:{valid:number;excluded:number};heroes:IntelHero[];augments:IntelAugment[];augment_dictionary:Record<string,{name:string;rarity:string}>;provisional_augments:Record<string,{games:number;wins:number;win_rate:number;source:string}>};
 export type IntelDetail = {patch:string;hero_id:string;snapshot_at:string;pairs:IntelPair[]};
 
+export type EquipmentOption = {items:string[];pick_rate:number;win_rate:number};
+export type EquipmentGroup = 'items'|'core'|'boots'|'starting'|'full';
+export type EquipmentHero = {id:string;name:string;title:string;stats_date:string|null;available:boolean} & Record<EquipmentGroup,EquipmentOption[]>;
+export type EquipmentSnapshot = {schema_version:1;source:'Tencent';source_url:string;mode:'KIWI';queue_id:2400;patch:null;sample_size:null;sample_scope:'undisclosed';retrieved_at:string;stats_date_min:string;stats_date_max:string;snapshot_id:string;heroes:EquipmentHero[];items:Record<string,{name:string;icon_url:string|null}>};
+
+export function rankEquipment(rows:EquipmentOption[],sort:string){
+ return [...rows].sort((a,b)=>(sort==='win_rate'?b.win_rate-a.win_rate:b.pick_rate-a.pick_rate)||b.pick_rate-a.pick_rate||a.items.join(',').localeCompare(b.items.join(',')));
+}
+
 // Ranking confidence, never displayed as a forecast of the next game's outcome.
 export function wilson(row:Counts){
  if(row.games<=0)return 0;

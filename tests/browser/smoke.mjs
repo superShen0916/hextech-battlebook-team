@@ -309,6 +309,36 @@ try {
     await page.goto(url('/intel.html'),{waitUntil:'domcontentloaded'});
     await page.locator('h1').waitFor();
     await fits('intel',320);
+    const equipmentResponse=await context.request.get(url('/api/version-intel/tencent-equipment.json'));
+    // Old development data packs may predate this optional external snapshot.
+    if(equipmentResponse.ok()){
+      const equipment=await equipmentResponse.json();
+      await page.getByRole('button',{name:'装备情报',exact:true}).click();
+      const heroSelect=page.getByRole('combobox',{name:'选择出装英雄',exact:true});
+      await heroSelect.selectOption('202');
+      const hero=equipment.heroes.find(h=>h.id==='202');
+      await page.getByTestId('equipment-date').waitFor();
+      assert.equal(await page.getByTestId('equipment-date').innerText(),hero.stats_date);
+      assert.equal(await page.locator('.equipment-row:not(.equipment-columns)').count(),hero.items.length);
+      assert.ok((await page.locator('.equipment-row:not(.equipment-columns)').first().innerText()).includes((Math.max(...hero.items.map(r=>r.pick_rate))*100).toFixed(2)+'%'));
+      await page.getByRole('combobox',{name:'出装排序',exact:true}).selectOption('win_rate');
+      assert.equal(await page.locator('.equipment-row:not(.equipment-columns)').first().locator('strong').innerText(),(Math.max(...hero.items.map(r=>r.win_rate))*100).toFixed(2)+'%');
+      for(const width of [1440,390,320]){
+        await page.setViewportSize({width,height:1000});
+        for(const label of ['单件装备','核心组合','完整出装']){
+          await page.getByRole('button',{name:new RegExp('^'+label)}).click();
+          await fits('equipment-'+label,width);
+        }
+        await page.getByRole('button',{name:/^核心组合/}).click();
+        await page.screenshot({path:path.join(out,`equipment-${width}.png`),fullPage:true});
+      }
+      await heroSelect.selectOption('157');
+      await page.getByRole('heading',{name:'亚索',exact:false}).waitFor();
+      await page.getByRole('searchbox',{name:'搜索出装英雄'}).fill('不存在的英雄');
+      await page.getByText('没有匹配的英雄，试试其他名字。',{exact:true}).waitFor();
+      await page.getByRole('searchbox',{name:'搜索出装英雄'}).fill('');
+      check('Tencent equipment: real source rates, hero changes, sorting, empty search, core/full builds at three widths');
+    }
     assert.deepEqual(results.errors, []);
     assert.deepEqual(results.failedResponses, []);
     results.ok = true;

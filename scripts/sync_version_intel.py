@@ -96,10 +96,23 @@ def project(bundle, dataset, seq):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--offline', action='store_true')
+    parser.add_argument('--equipment-only', action='store_true', help='refresh Tencent KIWI equipment only')
     parser.add_argument('--cache-dir', type=Path, default=ROOT / 'work/version-intel-cache')
     parser.add_argument('--output-dir', type=Path, default=ROOT / 'work/players-preview-20261022/public/api/version-intel')
     args = parser.parse_args()
     cache, output = args.cache_dir, args.output_dir
+    if args.equipment_only:
+        import sys
+        sys.path.insert(0, str(ROOT / 'app'))
+        from public_site import _exclusive_lock
+        from tencent_equipment import refresh
+        with _exclusive_lock(ROOT / 'work/build/release.lock') as acquired:
+            if not acquired:
+                raise RuntimeError('release_already_running')
+            result = refresh(cache, output, ROOT / 'app/static', output.parent.parent,
+                             offline=args.offline)
+        print(json.dumps(result, ensure_ascii=False))
+        return
     for name in ('latest.json', 'index.json'):
         if not args.offline:
             write(cache / name, download('main/' + name))
