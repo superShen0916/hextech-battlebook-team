@@ -185,21 +185,25 @@ class TencentEquipmentTests(unittest.TestCase):
             equipment.project(incomplete, champions, {}, lambda _: False)
 
     def test_failed_refresh_never_replaces_previous_snapshot_or_cache(self):
-        with tempfile.TemporaryDirectory() as folder:
-            base = Path(folder)
-            cache, output, static = [base / name for name in ('cache', 'output', 'static')]
-            for path in (cache, output, static):
-                path.mkdir()
-            (static / 'champions.json').write_text(json.dumps({'202': self.identity}), encoding='utf-8')
-            (static / 'items.json').write_text('{}', encoding='utf-8')
-            (static / 'augments.json').write_text('{}', encoding='utf-8')
-            for path in (cache, output):
-                (path / 'tencent-equipment.json').write_text('previous', encoding='utf-8')
-            with patch.object(equipment, 'fetch', return_value=response(dtstatdate='invalid')):
-                with self.assertRaises(ValueError):
+        cases = [(response(dtstatdate='invalid'), 'missing_equipment_date'),
+                 (response(augment_json_irank='255:1|202|1007|255|0.14|S&kSilver:&kGold:&kPrismatic:'),
+                  'incomplete_augment_rarities')]
+        for body, error in cases:
+            with self.subTest(error=error), tempfile.TemporaryDirectory() as folder:
+                base = Path(folder)
+                cache, output, static = [base / name for name in ('cache', 'output', 'static')]
+                for path in (cache, output, static):
+                    path.mkdir()
+                (static / 'champions.json').write_text(json.dumps({'202': self.identity}), encoding='utf-8')
+                for name in ('items.json', 'augments.json'):
+                    (static / name).write_text('{}', encoding='utf-8')
+                for path in (cache, output):
+                    (path / 'tencent-equipment.json').write_text('previous', encoding='utf-8')
+                with patch.object(equipment, 'fetch', return_value=body), self.assertRaisesRegex(ValueError, error):
                     equipment.refresh(cache, output, static, base)
-            for path in (cache, output):
-                self.assertEqual((path / 'tencent-equipment.json').read_text(encoding='utf-8'), 'previous')
+                for path in (cache, output):
+                    self.assertEqual((path / 'tencent-equipment.json').read_text(encoding='utf-8'), 'previous')
+                self.assertFalse((output / 'tencent-augments.json').exists())
 
 
 if __name__ == '__main__':

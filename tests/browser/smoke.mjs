@@ -377,7 +377,7 @@ try {
       await page.getByRole('searchbox',{name:'搜索腾讯海克斯',exact:true}).fill('');
       for(const width of [1440,390,320]){
         await page.setViewportSize({width,height:1000});
-        await page.locator('.tencent-hex-controls').scrollIntoViewIfNeeded();
+        await page.locator('.hex-filter-row').scrollIntoViewIfNeeded();
         await fits('tencent-augments',width);
         await page.screenshot({path:path.join(out,`tencent-augments-${width}.png`)});
       }

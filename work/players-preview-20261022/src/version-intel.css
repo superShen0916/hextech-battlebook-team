@@ -84,3 +84,5 @@
 .tencent-hex-panel{padding-top:15px}.tencent-hex-panel .intel-footer{margin-top:30px}.tencent-hex-controls{grid-template-columns:1.5fr 1fr 1fr}
 @media(max-width:1000px){.hex-card-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:700px){.intel-providers{display:grid;grid-template-columns:1fr 1fr;gap:8px}.intel-providers button{padding:10px 8px;font-size:11px}.hex-filter-row{gap:15px;margin:18px 0}.hex-search{width:100%;min-width:0}.hex-card-grid{grid-template-columns:1fr;gap:12px}.hex-stat-card{padding:17px}.hex-stat-card h3{font-size:16px}.hex-card-stats strong{font-size:30px}.hex-rarity-filter button{padding:8px 12px}.tencent-hex-controls label:first-child{grid-column:1/-1}.tencent-hex-controls label:nth-child(2){grid-column:1;grid-row:2}.tencent-hex-controls label:last-child{grid-column:2;grid-row:2}.tencent-hex-panel .equipment-heading h2{font-size:22px;line-height:1.5}}
+
+@media(max-width:700px){.tencent-hex-controls{grid-template-columns:1fr 1fr}}
