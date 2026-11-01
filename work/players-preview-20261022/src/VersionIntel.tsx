@@ -1,5 +1,5 @@
 import {useEffect,useMemo,useState} from 'react';
-import {rankRows,readIntel,selectPairs,type IntelIndex,type IntelOverview,type IntelDetail,type IntelHero} from '../lib/version-intel';
+import {intelTabs,readIntelRoute,rankRows,readIntel,selectPairs,type IntelSource,type IntelTab,type IntelIndex,type IntelOverview,type IntelDetail,type IntelHero} from '../lib/version-intel';
 import {track} from '../lib/analytics';
 import TencentEquipment from './TencentEquipment';
 import TencentAugments from './TencentAugments';
@@ -9,38 +9,43 @@ const n=(v:number)=>v.toLocaleString('zh-CN');
 const pc=(v:number)=>(v*100).toFixed(1)+'%';
 const date=(v:string)=>new Date(v).toLocaleString('zh-CN',{timeZone:'Asia/Shanghai',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false});
 const rarity=(r:string)=>({silver:'白银',gold:'黄金',prismatic:'棱彩'}[r]||r);
-const tabs=[['heroes','英雄胜率'],['augments','海克斯胜率'],['pairs','英雄 × 海克斯'],['items','装备情报']] as const;
-type Tab=typeof tabs[number][0];
+const sources=[['aramhex','AramHex','社区采样','英雄、海克斯与搭配胜率 · 有样本'],['tencent','腾讯官方数据','腾讯接口','海克斯分档与使用率 · 出装胜率']] as const;
 function HeroPortrait({hero}:{hero:IntelHero}){return <img className="intel-portrait" src={`/assets/champions/${hero.id}.png`} alt="" loading="lazy" onError={e=>{e.currentTarget.style.visibility='hidden';}}/>;}
 
 export default function VersionIntel(){
  const[index,setIndex]=useState<IntelIndex|null>(null),[patch,setPatch]=useState(''),[data,setData]=useState<IntelOverview|null>(null);
- const[tab,setTab]=useState<Tab>(()=>(['heroes','augments','pairs','items'] as string[]).includes(new URLSearchParams(location.search).get('tab')||'')?new URLSearchParams(location.search).get('tab') as Tab:'heroes'),[query,setQuery]=useState(''),[sort,setSort]=useState('confidence'),[minimum,setMinimum]=useState(250),[page,setPage]=useState(1);
- const[pairSource,setPairSource]=useState(()=>new URLSearchParams(location.search).get('source')==='tencent'?'tencent':'aramhex'),[pairRarity,setPairRarity]=useState('all');
+ const[view,setView]=useState<{source:IntelSource;aramhex:IntelTab;tencent:IntelTab}>(()=>{const route=readIntelRoute(location.search);return {source:route.source,aramhex:route.source==='aramhex'?route.tab:'heroes',tencent:route.source==='tencent'?route.tab:'pairs'};});
+ const source=view.source,tab=view[source];
+ const setTab=(next:IntelTab)=>setView(current=>({...current,[current.source]:next}));
+ const[query,setQuery]=useState(''),[sort,setSort]=useState('confidence'),[minimum,setMinimum]=useState(250),[page,setPage]=useState(1),[pairRarity,setPairRarity]=useState('all');
  const[heroId,setHeroId]=useState('157'),[detail,setDetail]=useState<IntelDetail|null>(null),[showPbe,setShowPbe]=useState(false);
- const[error,setError]=useState(''),[pairError,setPairError]=useState(''),[retry,setRetry]=useState(0);
- useEffect(()=>{const abort=new AbortController();readIntel<IntelIndex>('/api/version-intel/index.json',abort.signal).then(value=>{setIndex(value);setPatch(p=>p||value.default_patch);setError('');}).catch(e=>{if(!abort.signal.aborted)setError(e.message);});return()=>abort.abort();},[retry]);
- useEffect(()=>{if(!patch)return;const abort=new AbortController();setData(null);setDetail(null);setError('');readIntel<IntelOverview>(`/api/version-intel/${patch}/overview.json`,abort.signal).then(value=>{if(value.patch!==patch)throw new Error('版本不匹配，请重新读取。');setData(value);}).catch(e=>{if(!abort.signal.aborted)setError(e.message);});return()=>abort.abort();},[patch,retry]);
+ const[indexError,setIndexError]=useState(''),[error,setError]=useState(''),[pairError,setPairError]=useState(''),[retry,setRetry]=useState(0);
+ useEffect(()=>{const url=new URL(location.href);url.searchParams.set('source',source);url.searchParams.set('tab',tab);history.replaceState(null,'',url);},[source,tab]);
+ useEffect(()=>{if(source!=='aramhex')return;const abort=new AbortController();setIndexError('');readIntel<IntelIndex>('/api/version-intel/index.json',abort.signal).then(value=>{setIndex(value);setPatch(p=>p||value.default_patch);}).catch(e=>{if(!abort.signal.aborted)setIndexError(e.message);});return()=>abort.abort();},[retry,source]);
+ useEffect(()=>{if(!patch||source!=='aramhex')return;const abort=new AbortController();setData(null);setDetail(null);setError('');readIntel<IntelOverview>(`/api/version-intel/${patch}/overview.json`,abort.signal).then(value=>{if(value.patch!==patch)throw new Error('版本不匹配，请重新读取。');setData(value);}).catch(e=>{if(!abort.signal.aborted)setError(e.message);});return()=>abort.abort();},[patch,retry,source]);
  useEffect(()=>{
-  setDetail(null);setPairError('');if(!data||tab!=='pairs'||pairSource!=='aramhex')return;
+  setDetail(null);setPairError('');if(!data||tab!=='pairs'||source!=='aramhex')return;
   const abort=new AbortController();readIntel<IntelDetail>(`/api/version-intel/${patch}/heroes/${heroId}.json`,abort.signal).then(value=>{
    if(value.patch!==patch||value.hero_id!==heroId||value.snapshot_at!==data.snapshot_at)throw new Error('搭配数据与当前版本快照不一致，请重试。');setDetail(value);
   }).catch(e=>{if(!abort.signal.aborted)setPairError(e.message);});return()=>abort.abort();
- },[data,patch,heroId,tab,retry,pairSource]);
- useEffect(()=>{setPage(1);},[patch,tab,query,sort,minimum,heroId,showPbe,pairRarity,pairSource]);
+ },[data,patch,heroId,tab,retry,source]);
+ useEffect(()=>{setPage(1);},[patch,tab,query,sort,minimum,heroId,showPbe,pairRarity,source]);
  const hero=data?.heroes.find(h=>h.id===heroId);
  const heroRows=useMemo(()=>rankRows((data?.heroes||[]).filter(h=>h.games>=minimum&&(h.name+h.title+h.id).includes(query.trim())),sort),[data,minimum,query,sort]);
  const augmentRows=useMemo(()=>rankRows((data?.augments||[]).filter(a=>a.games>=minimum&&(a.name+rarity(a.rarity)+a.id).includes(query.trim())),sort),[data,minimum,query,sort]);
  const pairRows=useMemo(()=>rankRows(selectPairs(detail?.pairs||[],showPbe,minimum).filter(p=>(pairRarity==='all'||data?.augment_dictionary[p.id]?.rarity===pairRarity)&&((data?.augment_dictionary[p.id]?.name||'')+p.id).includes(query.trim())),sort),[data,detail,minimum,showPbe,query,sort,pairRarity]);
  const count=tab==='heroes'?heroRows.length:tab==='augments'?augmentRows.length:pairRows.length;
  const pages=Math.max(1,Math.ceil(count/20)),offset=(Math.min(page,pages)-1)*20;
- const chooseHero=(id:string)=>{track('intel_detail',{detail:JSON.stringify({hero:id,from:tab})});setHeroId(id);setTab('pairs');setPairSource('aramhex');setQuery('');setShowPbe(false);};
+ const chooseHero=(id:string)=>{track('intel_detail',{detail:JSON.stringify({hero:id,from:tab})});setHeroId(id);setView(current=>({...current,source:'aramhex',aramhex:'pairs'}));setQuery('');setShowPbe(false);};
  return <main className="site-shell intel-shell">
   <header className="intel-header"><a className="brand" href="/"><span className="brand-symbol">⬡</span><span>海克斯战报馆<small>HEXTECH BATTLEBOOK</small></span></a><a className="intel-back" href="/">← 返回玩家大厅</a><span className="intel-preview">版本快照</span></header>
-  <section className="intel-hero"><div><p className="eyebrow">PATCH INTELLIGENCE</p><h1>英雄随机，<span>选择有据。</span></h1><p>看看这个版本谁更顺手，哪个海克斯更合拍。</p></div>{tab==='items'||(tab==='pairs'&&pairSource==='tencent')?<div className="equipment-context"><span>海克斯大乱斗</span><small>腾讯统计 · 按统计日期查看</small></div>:<label>统计补丁<select aria-label="统计补丁" value={patch} onChange={e=>{track('intel_patch',{detail:JSON.stringify({patch:e.target.value})});setPatch(e.target.value);setShowPbe(false);}}>{index?.datasets.map(d=><option key={d.patch} value={d.patch}>{d.patch}{d.patch===index.default_patch?' · 最新已收录':' · 历史快照'} · 常规规则</option>)}</select><small>按补丁分开统计 · 不跨版本混算</small></label>}</section>
-   <nav className="intel-tabs" aria-label="情报分类">{tabs.map(([key,label])=><button key={key} aria-pressed={tab===key} onClick={()=>{track('intel_tab',{detail:JSON.stringify({tab:key,patch})});setTab(key);setQuery('');}}>{label}</button>)}</nav>
-  {tab==='pairs'&&<nav className="intel-providers" aria-label="海克斯数据来源"><button aria-pressed={pairSource==='aramhex'} onClick={()=>setPairSource('aramhex')}>AramHex · 胜率与样本</button><button aria-pressed={pairSource==='tencent'} onClick={()=>setPairSource('tencent')}>腾讯 · 分档与使用率</button></nav>}
-  {tab==='items'?<TencentEquipment/>:tab==='pairs'&&pairSource==='tencent'?<TencentAugments heroId={heroId} onHeroChange={setHeroId}/>:error?<div className="intel-message" role="alert">{error}<button className="button" onClick={()=>setRetry(r=>r+1)}>重新读取</button></div>:!data?<p className="intel-message" role="status">正在读取版本统计…</p>:<>
+  <div className="intel-source-label"><span>选择数据来源</span><small>各看各的统计口径</small></div>
+  <nav className="intel-source-tabs" aria-label="数据来源">{sources.map(([key,name,badge,summary])=><button key={key} className={'intel-source-tab source-'+key} aria-label={name} aria-pressed={source===key} onClick={()=>{track('intel_tab',{detail:JSON.stringify({source:key})});setView(current=>({...current,source:key}));setQuery('');}}><span className="intel-source-name"><b>{name}</b><i>{badge}</i></span><span className="intel-source-summary">{summary}</span><span className="intel-source-status">{source===key?'✓ 当前来源':'切换来源 →'}</span></button>)}</nav>
+  <section className={'intel-provider-panel provider-'+source} aria-label={source==='aramhex'?'AramHex统计':'腾讯官方统计'}>
+  <section className="intel-hero"><div><p className="eyebrow">{source==='aramhex'?'ARAMHEX · COMMUNITY STATS':'TENCENT · OFFICIAL DATA'}</p><h1>英雄随机，<span>选择有据。</span></h1><p>{source==='aramhex'?'看胜率与样本，按版本寻找英雄和海克斯搭配。':'看腾讯海克斯分档与出装，按来源统计日期查看。'}</p></div>{source==='tencent'?<div className="equipment-context"><span>海克斯大乱斗</span><small>腾讯统计 · 按统计日期查看</small></div>:<label>统计补丁<select aria-label="统计补丁" value={patch} onChange={e=>{track('intel_patch',{detail:JSON.stringify({patch:e.target.value})});setPatch(e.target.value);setShowPbe(false);}}>{index?.datasets.map(d=><option key={d.patch} value={d.patch}>{d.patch}{d.patch===index.default_patch?' · 最新已收录':' · 历史快照'} · 常规规则</option>)}</select><small>按补丁分开统计 · 不跨版本混算</small></label>}</section>
+   <nav className="intel-tabs" aria-label="情报分类">{intelTabs[source].map(([key,label])=><button key={key} aria-pressed={tab===key} onClick={()=>{track('intel_tab',{detail:JSON.stringify({tab:key,patch,source})});setTab(key);setQuery('');}}>{label}</button>)}</nav>
+  <p className="intel-provider-note" data-testid="intel-source-note">{source==='aramhex'?'当前来源：AramHex 社区采样 · 提供胜率、场数与胜场；仅代表已采集样本。':'当前来源：腾讯官方接口数据 · 海克斯仅有分档和使用率，出装另有胜率；统计范围未公开。'}</p>
+  {source==='tencent'?(tab==='items'?<TencentEquipment/>:<TencentAugments heroId={heroId} onHeroChange={setHeroId}/>):indexError||error?<div className="intel-message" role="alert">{indexError||error}<button className="button" onClick={()=>setRetry(r=>r+1)}>重新读取</button></div>:!data?<p className="intel-message" role="status">正在读取版本统计…</p>:<>
    <div className="intel-scope"><span className="intel-live">正式服 {data.patch} · 常规</span><span>数据截至 {date(data.snapshot_at)}</span><span>来源：<a href={data.source_url} target="_blank" rel="noreferrer">AramHex ↗</a></span></div>
    <section className="intel-metrics" aria-label="统计样本"><div><span>有效对局</span><strong>{n(data.matches.valid)}</strong><small>{data.regions.length} 个大区的已采集样本</small></div><div><span>有记录的英雄</span><strong>{data.heroes.length}</strong><small>全体样本 · 不等于全服全集</small></div><div><span>正式服海克斯</span><strong>{data.augments.length}</strong><small>{Object.keys(data.provisional_augments).length?'另有 '+Object.keys(data.provisional_augments).length+' 个仅测试服参考':'仅统计本补丁局末持有'}</small></div></section>
    <p className="intel-caution">统计窗口 {date(data.window.start)} — {date(data.window.end_exclusive)}（不含终点）。只代表这些已采集对局；胜率描述历史表现，不是下一局的获胜概率。</p>
@@ -61,5 +66,6 @@ export default function VersionIntel(){
    <details className="intel-method"><summary>胜率到底怎么算？</summary><p>英雄胜率 = 使用该英雄的胜场 ÷ 该英雄参赛场数。海克斯胜率 = 局末持有该海克斯的胜场 ÷ 持有人次；同一玩家六个槽位去重。英雄搭配胜率只在该英雄的样本里计算。</p><p>每场比赛有10位玩家，所以“持有人次”可以大于对局数。跨英雄汇总采用胜场与人次分别求和后相除，不把各英雄的百分数简单平均。</p><p>只计正常结束、至少4分钟、10人齐全且5胜5负的标准海克斯对局。朋友个人胜率与这里的公共样本分别展示；不同版本、活动规则和测试服不混算。</p><p>稳健排序使用 Wilson 95% 置信下界，不是 Hexdata 的 HexScore。样本越少，不确定性越大；持有胜率与英雄基准差值都不证明因果。</p></details>
    <footer className="intel-footer"><p>数据来源：<a href={data.source_url} target="_blank" rel="noreferrer">AramHex / czgreat/aramhex-data</a> · {data.license}（署名、非商业）<br/>本页对公开汇总重新计算比例并分离测试服数据；没有修改个人战绩。</p><a href="https://hexdata.com.cn/" target="_blank" rel="noreferrer">参考网站：Hexdata ↗</a></footer>
   </>}
+  </section>
  </main>;
 }
