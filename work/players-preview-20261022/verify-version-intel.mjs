@@ -2,7 +2,15 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import ts from 'typescript';
 const code=ts.transpileModule(fs.readFileSync('lib/version-intel.ts','utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ES2022}}).outputText;
-const {rankRows,selectPairs,rankEquipment,rankTencentAugments}=await import('data:text/javascript;base64,'+Buffer.from(code).toString('base64'));
+const {intelTabs,readIntelRoute,rankRows,selectPairs,rankEquipment,rankTencentAugments}=await import('data:text/javascript;base64,'+Buffer.from(code).toString('base64'));
+assert.deepEqual(intelTabs.aramhex.map(([key])=>key),['heroes','augments','pairs']);
+assert.deepEqual(intelTabs.tencent.map(([key])=>key),['pairs','items']);
+for(const [search,source,tab] of [
+ ['', 'aramhex','heroes'],['?tab=pairs','aramhex','pairs'],['?tab=items','tencent','items'],
+ ['?source=tencent','tencent','pairs'],['?source=tencent&tab=items','tencent','items'],
+ ['?source=tencent&tab=heroes','tencent','pairs'],['?source=aramhex&tab=items','aramhex','heroes'],
+ ['?source=unknown&tab=augments','aramhex','augments'],['?source=tencent&tab=unknown','tencent','pairs'],
+])assert.deepEqual(readIntelRoute(search),{source,tab});
 assert.equal(rankRows([{id:'tiny',games:1,wins:1,win_rate:1},{id:'observed',games:100,wins:60,win_rate:.6}],'confidence')[0].id,'observed');
 assert.equal(selectPairs([{id:'a',games:100,wins:50,win_rate:.5,source:'pbe'},{id:'b',games:100,wins:50,win_rate:.5,source:'live'}],false,0).length,1);
 const read=file=>JSON.parse(fs.readFileSync('public/api/version-intel/'+file,'utf8'));

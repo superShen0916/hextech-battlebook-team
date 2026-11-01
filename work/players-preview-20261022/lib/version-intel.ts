@@ -6,6 +6,19 @@ export type IntelIndex = {default_patch:string;datasets:{patch:string;snapshot_a
 export type IntelOverview = {patch:string;snapshot_at:string;license:string;source_url:string;regions:string[];window:{start:string;end_exclusive:string};matches:{valid:number;excluded:number};heroes:IntelHero[];augments:IntelAugment[];augment_dictionary:Record<string,{name:string;rarity:string;icon_url?:string|null}>;provisional_augments:Record<string,{games:number;wins:number;win_rate:number;source:string}>};
 export type IntelDetail = {patch:string;hero_id:string;snapshot_at:string;pairs:IntelPair[]};
 
+export const intelTabs = {
+ aramhex: [['heroes','英雄胜率'],['augments','海克斯胜率'],['pairs','英雄搭配']],
+ tencent: [['pairs','海克斯分档'],['items','装备情报']],
+} as const;
+export type IntelSource = keyof typeof intelTabs;
+export type IntelTab = typeof intelTabs[IntelSource][number][0];
+export function readIntelRoute(search:string):{source:IntelSource;tab:IntelTab}{
+ const params=new URLSearchParams(search),requested=params.get('tab'),provider=params.get('source');
+ const source:IntelSource=provider==='tencent'||(provider!=='aramhex'&&requested==='items')?'tencent':'aramhex';
+ const tab=intelTabs[source].find(([key])=>key===requested)?.[0]||intelTabs[source][0][0];
+ return {source,tab};
+}
+
 export type EquipmentOption = {items:string[];pick_rate:number;win_rate:number};
 export type EquipmentGroup = 'items'|'core'|'boots'|'starting'|'full';
 export type EquipmentHero = {id:string;name:string;title:string;stats_date:string|null;available:boolean} & Record<EquipmentGroup,EquipmentOption[]>;

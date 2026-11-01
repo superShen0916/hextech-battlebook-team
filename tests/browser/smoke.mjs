@@ -308,11 +308,25 @@ try {
     check('real night summary, PNG generation, restorable share link, real two-player intersection');
     await page.goto(url('/intel.html'),{waitUntil:'domcontentloaded'});
     await page.locator('h1').waitFor();
+    const sources=page.getByRole('navigation',{name:'数据来源',exact:true});
+    const categories=page.getByRole('navigation',{name:'情报分类',exact:true});
+    assert.equal(await sources.getByRole('button',{name:'AramHex',exact:true}).getAttribute('aria-pressed'),'true');
+    assert.deepEqual(await categories.getByRole('button').allTextContents(),['英雄胜率','海克斯胜率','英雄搭配']);
+    assert.ok((await page.getByTestId('intel-source-note').innerText()).includes('AramHex 社区采样'));
+    for(const width of [1440,390,320]){
+      await page.setViewportSize({width,height:1000});
+      await fits('aramhex-source-navigation',width);
+      await page.screenshot({path:path.join(out,`source-aramhex-${width}.png`)});
+    }
     await fits('intel',320);
     const equipmentResponse=await context.request.get(url('/api/version-intel/tencent-equipment.json'));
     // Old development data packs may predate this optional external snapshot.
     if(equipmentResponse.ok()){
       const equipment=await equipmentResponse.json();
+      await sources.getByRole('button',{name:'腾讯官方数据',exact:true}).click();
+      assert.deepEqual(await categories.getByRole('button').allTextContents(),['海克斯分档','装备情报']);
+      assert.equal(await page.getByRole('combobox',{name:'统计补丁',exact:true}).count(),0);
+      assert.ok((await page.getByTestId('intel-source-note').innerText()).includes('腾讯官方接口数据'));
       await page.getByRole('button',{name:'装备情报',exact:true}).click();
       const heroSelect=page.getByRole('combobox',{name:'选择出装英雄',exact:true});
       await heroSelect.selectOption('202');
@@ -339,8 +353,8 @@ try {
       await page.getByRole('searchbox',{name:'搜索出装英雄'}).fill('');
       check('Tencent equipment: real source rates, hero changes, sorting, empty search, core/full builds at three widths');
     }
-    await page.getByRole('button',{name:'英雄 × 海克斯',exact:true}).click();
-    await page.getByRole('button',{name:'AramHex · 胜率与样本',exact:true}).click();
+    await sources.getByRole('button',{name:'AramHex',exact:true}).click();
+    await page.getByRole('button',{name:'英雄搭配',exact:true}).click();
     await page.getByRole('combobox',{name:'选择搭配英雄',exact:true}).selectOption('157');
     await page.getByRole('combobox',{name:'最少样本',exact:true}).selectOption('0');
     await page.getByRole('combobox',{name:'情报排序',exact:true}).selectOption('win_rate');
@@ -362,7 +376,8 @@ try {
     const referenceResponse=await context.request.get(url('/api/version-intel/tencent-augments.json'));
     if(referenceResponse.ok()){
       const reference=await referenceResponse.json(),hero=reference.heroes.find(h=>h.id==='157');
-      await page.getByRole('button',{name:'腾讯 · 分档与使用率',exact:true}).click();
+      await sources.getByRole('button',{name:'腾讯官方数据',exact:true}).click();
+      await page.getByRole('button',{name:'海克斯分档',exact:true}).click();
       await page.getByRole('combobox',{name:'选择腾讯海克斯英雄',exact:true}).selectOption('157');
       await page.getByTestId('tencent-augment-date').waitFor();
       assert.equal(await page.getByTestId('tencent-augment-date').innerText(),hero.stats_date);
@@ -383,6 +398,35 @@ try {
       }
       await page.getByRole('searchbox',{name:'搜索腾讯海克斯',exact:true}).fill('不存在的海克斯');
       await page.getByText('没有符合条件的海克斯，试试清除筛选。',{exact:true}).waitFor();
+      for(const width of [1440,390,320]){
+        await page.setViewportSize({width,height:1000});
+        await sources.scrollIntoViewIfNeeded();
+        await fits('tencent-source-navigation',width);
+        await page.screenshot({path:path.join(out,`source-tencent-${width}.png`)});
+      }
+      await sources.getByRole('button',{name:'AramHex',exact:true}).click();
+      assert.equal(await categories.getByRole('button',{name:'英雄搭配',exact:true}).getAttribute('aria-pressed'),'true');
+      await sources.getByRole('button',{name:'腾讯官方数据',exact:true}).click();
+      await page.getByTestId('tencent-augment-date').waitFor();
+      assert.equal(new URL(page.url()).searchParams.get('source'),'tencent');
+      assert.equal(new URL(page.url()).searchParams.get('tab'),'pairs');
+      await page.reload({waitUntil:'domcontentloaded'});
+      await page.getByTestId('tencent-augment-date').waitFor();
+      assert.equal(await sources.getByRole('button',{name:'腾讯官方数据',exact:true}).getAttribute('aria-pressed'),'true');
+      if(equipmentResponse.ok()){
+        await page.goto(url('/intel.html',{tab:'items'}),{waitUntil:'domcontentloaded'});
+        await page.getByTestId('equipment-date').waitFor();
+        assert.equal(await sources.getByRole('button',{name:'腾讯官方数据',exact:true}).getAttribute('aria-pressed'),'true');
+        assert.equal(await categories.getByRole('button',{name:'装备情报',exact:true}).getAttribute('aria-pressed'),'true');
+      }
+      const externalRequests=[];
+      const watchAramHex=request=>{if(/\/api\/version-intel\/(index\.json|\d+\.\d+\/)/.test(request.url()))externalRequests.push(request.url());};
+      page.on('request',watchAramHex);
+      await page.goto(url('/intel.html',{source:'tencent',tab:'pairs'}),{waitUntil:'domcontentloaded'});
+      await page.getByTestId('tencent-augment-date').waitFor();
+      page.off('request',watchAramHex);
+      assert.deepEqual(externalRequests,[],'Tencent entry must not depend on AramHex requests');
+      check('source navigation: isolated categories, remembered views, reload/deep links, legacy equipment link, no AramHex requests from Tencent');
       check('Tencent augments: real pick rates and source tiers, rarity-specific tiers, search, three widths');
     }
     assert.deepEqual(results.errors, []);
