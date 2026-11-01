@@ -15,13 +15,14 @@ import tencent_equipment as equipment
 import sync_version_intel as importer
 
 
-def response(**changes):
+def response(hero_id='202', **changes):
     body = {'dtstatdate': '20261031',
             'itemone_json': json.dumps({'2': {'itemone': '3031', 'showrate': 8403, 'winrate': 4813},
                                        '1': {'itemone': '6676', 'showrate': 9005, 'winrate': 4788}}),
             'itemcore_json': json.dumps({'1': {'itemcore': '6676&3031&3036', 'showrate': 1725, 'winrate': 4874}}),
             'itemshoes': '3009$0.4516$0.4766', 'itemout': '1036,2003$0.3$0.49',
-            'itemover_rec': '1_3009,3031,6676_0.0614_0.4705'}
+            'itemover_rec': '1_3009,3031,6676_0.0614_0.4705',
+            'augment_json_irank': f'255:1|{hero_id}|1007|255|0.14|S&kSilver:1|{hero_id}|1007|kSilver|0.14|A&kGold:&kPrismatic:'}
     body.update(changes)
     return {'code': 0, 'data': {'_fieldValues': {'unpredictable_key': json.dumps(body)}}}
 
@@ -38,6 +39,30 @@ class TencentEquipmentTests(unittest.TestCase):
         self.assertAlmostEqual(hero['boots'][0]['pick_rate'], .4516)
         self.assertEqual(hero['core'][0]['items'], ['6676', '3031', '3036'])
         self.assertEqual(hero['full'][0]['items'], ['3009', '3031', '6676'])
+
+    def test_augment_projection_keeps_both_source_tiers_without_inventing_win_rates(self):
+        raw = {'retrieved_at': '2026-11-01T00:00:00Z', 'heroes': {'202': response()}}
+        gear = equipment.project(raw, {'202': self.identity}, {}, lambda _: False)
+        data = equipment.project_augments(raw, gear, {'1007': {'name': '测试海克斯', 'rarity': 'gold'}}, lambda _: False)
+        row = data['heroes'][0]['augments'][0]
+        self.assertIsNone(data['win_rate'])
+        self.assertIsNone(data['sample_size'])
+        self.assertEqual(row['tier'], 'S')
+        self.assertEqual(row['rarity_tier'], 'A')
+        self.assertEqual(row['rarity'], 'silver')  # Source classification, not catalog override.
+        self.assertEqual(row['pick_rate'], .14)
+        for field in ('games', 'wins', 'win_rate'):
+            self.assertNotIn(field, row)
+
+    def test_augment_projection_rejects_missing_cross_hero_and_inconsistent_rows(self):
+        values = [None, '255:1|157|1007|255|0.14|S&kSilver:&kGold:&kPrismatic:',
+                  '255:1|202|1007|255|0.14|S&kSilver:1|202|1007|kSilver|0.15|A&kGold:&kPrismatic:',
+                  '255:1|202|1007|255|0.14|S&kSilver:&kGold:&kPrismatic:']
+        for value in values:
+            raw = {'retrieved_at': '2026-11-01T00:00:00Z', 'heroes': {'202': response(augment_json_irank=value)}}
+            gear = equipment.project(raw, {'202': self.identity}, {}, lambda _: False)
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                equipment.project_augments(raw, gear, {}, lambda _: False)
 
     def test_reject_changed_envelopes_errors_invalid_dates_and_rates(self):
         invalid = [ {'code': 1}, {'code': 0, 'data': {'_fieldValues': {}}},
@@ -122,6 +147,7 @@ class TencentEquipmentTests(unittest.TestCase):
                 path.mkdir()
             (static / 'champions.json').write_text(json.dumps({'202': self.identity}), encoding='utf-8')
             (static / 'items.json').write_text('{}', encoding='utf-8')
+            (static / 'augments.json').write_text('{}', encoding='utf-8')
             raw = {'retrieved_at': '2026-11-01T00:00:00Z', 'heroes': {'202': response()}}
             cached = cache / 'tencent-equipment.json'
             cached.write_text(json.dumps(raw), encoding='utf-8')
@@ -166,6 +192,7 @@ class TencentEquipmentTests(unittest.TestCase):
                 path.mkdir()
             (static / 'champions.json').write_text(json.dumps({'202': self.identity}), encoding='utf-8')
             (static / 'items.json').write_text('{}', encoding='utf-8')
+            (static / 'augments.json').write_text('{}', encoding='utf-8')
             for path in (cache, output):
                 (path / 'tencent-equipment.json').write_text('previous', encoding='utf-8')
             with patch.object(equipment, 'fetch', return_value=response(dtstatdate='invalid')):

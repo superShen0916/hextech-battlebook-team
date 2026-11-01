@@ -1,4 +1,4 @@
-"""Tencent's public KIWI equipment aggregates; no client or personal match access.
+"""Tencent's public KIWI equipment aggregates and augment tiers/pick rates.
 
 Imported by sync_version_intel.py. Percentages are kept as supplied by Tencent;
 the endpoint publishes neither sample counts nor a patch/window/region scope.
@@ -94,6 +94,70 @@ def project_hero(body, identifier, identity):
     return result
 
 
+def project_augments(raw, equipment, catalog, icon_exists):
+    """Keep source tiers/pick rates; never manufacture missing win rates/counts."""
+    rarity_codes = {'kSilver': 'silver', 'kGold': 'gold', 'kPrismatic': 'prismatic'}
+    heroes = []
+    used = set()
+    for identity in equipment['heroes']:
+        hid = identity['id']
+        source = payload(raw['heroes'][hid])
+        rows = []
+        if source is not None:
+            encoded = text(source, 'augment_json_irank')
+            segments = {}
+            for segment in encoded.split('&') if encoded else []:
+                key, delimiter, value = segment.partition(':')
+                if not delimiter or key in segments or key not in ('255', *rarity_codes):
+                    raise ValueError('invalid_augment_segments')
+                parsed = {}
+                for record in value.split('#') if value else []:
+                    parts = record.split('|')
+                    if (len(parts) != 6 or parts[1] != hid or parts[3] != key
+                            or not re.fullmatch(r'[1-9][0-9]*', parts[0])
+                            or not re.fullmatch(r'[1-9][0-9]*', parts[2])
+                            or parts[5] not in ('S', 'A', 'B', 'C') or parts[2] in parsed):
+                        raise ValueError('invalid_augment_record')
+                    parsed[parts[2]] = {'id': parts[2], 'source_rank': int(parts[0]),
+                                        'pick_rate': number(parts[4]), 'tier': parts[5]}
+                segments[key] = parsed
+            if encoded:
+                if set(segments) != {'255', *rarity_codes}:
+                    raise ValueError('incomplete_augment_segments')
+                classified = {}
+                for key, rarity in rarity_codes.items():
+                    for aid, row in segments[key].items():
+                        if aid in classified:
+                            raise ValueError('duplicate_augment_rarity')
+                        all_row = segments['255'].get(aid)
+                        if (not all_row
+                                or not math.isclose(row['pick_rate'], all_row['pick_rate'], abs_tol=1e-9)):
+                            raise ValueError('inconsistent_augment_segments')
+                        classified[aid] = {**all_row, 'rarity': rarity,
+                                           'rarity_tier': row['tier'], 'rarity_rank': row['source_rank']}
+                if set(classified) != set(segments['255']):
+                    raise ValueError('incomplete_augment_rarities')
+                rows = sorted(classified.values(), key=lambda row: row['source_rank'])
+        used.update(row['id'] for row in rows)
+        heroes.append({key: identity[key] for key in ('id', 'name', 'title', 'stats_date')} | {'augments': rows})
+    if not used:
+        raise ValueError('empty_augment_dataset')
+    dictionary = {}
+    for aid in sorted(used, key=int):
+        entry = catalog.get(aid, {})
+        dictionary[aid] = {'name': entry.get('name') or '海克斯 #' + aid,
+                           'description': entry.get('description', ''),
+                           'description_patch': entry.get('description_patch'),
+                           'icon_url': '/assets/augments/' + aid + '.png' if icon_exists(aid) else None}
+    digest = hashlib.sha256(json.dumps(heroes, ensure_ascii=False, sort_keys=True,
+                                      separators=(',', ':'), allow_nan=False).encode()).hexdigest()
+    return {key: equipment[key] for key in ('source', 'source_url', 'mode', 'queue_id', 'patch',
+                                            'sample_size', 'sample_scope', 'window', 'regions',
+                                            'retrieved_at', 'stats_date_min', 'stats_date_max')} | {
+        'schema_version': 1, 'win_rate': None, 'metric': 'source_tier_and_pick_rate',
+        'snapshot_id': digest, 'heroes': heroes, 'dictionary': dictionary}
+
+
 def fetch(identifier):
     if not re.fullmatch(r'[1-9][0-9]*', identifier):
         raise ValueError('invalid_equipment_hero')
@@ -147,6 +211,7 @@ def refresh(cache, output, static, public, *, offline=False):
     from snapshot_io import write_json
     champions = json.loads((static / 'champions.json').read_text(encoding='utf-8'))
     items = json.loads((static / 'items.json').read_text(encoding='utf-8'))
+    catalog = json.loads((static / 'augments.json').read_text(encoding='utf-8'))
     path = cache / 'tencent-equipment.json'
     if offline:
         raw = json.loads(path.read_bytes())
@@ -159,10 +224,13 @@ def refresh(cache, output, static, public, *, offline=False):
             pool.shutdown(wait=True, cancel_futures=True)
         raw = {'retrieved_at': datetime.now(timezone.utc).isoformat(timespec='seconds'), 'heroes': bodies}
     data = project(raw, champions, items, lambda iid: (public / 'assets/items' / (iid + '.png')).is_file())
+    augments = project_augments(raw, data, catalog, lambda aid: (public / 'assets/augments' / (aid + '.png')).is_file())
     if not offline:
         write_json(path, raw)
     write_json(output / 'tencent-equipment.json', data)
+    write_json(output / 'tencent-augments.json', augments)
     return {'ok': True, 'source': 'Tencent', 'heroes': len(data['heroes']),
             'available': sum(hero['available'] for hero in data['heroes']),
+            'augment_pairs': sum(len(hero['augments']) for hero in augments['heroes']),
             'stats_date_min': data['stats_date_min'], 'stats_date_max': data['stats_date_max'],
             'snapshot_id': data['snapshot_id']}

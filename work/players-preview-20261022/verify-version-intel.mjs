@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import ts from 'typescript';
 const code=ts.transpileModule(fs.readFileSync('lib/version-intel.ts','utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ES2022}}).outputText;
-const {rankRows,selectPairs,rankEquipment}=await import('data:text/javascript;base64,'+Buffer.from(code).toString('base64'));
+const {rankRows,selectPairs,rankEquipment,rankTencentAugments}=await import('data:text/javascript;base64,'+Buffer.from(code).toString('base64'));
 assert.equal(rankRows([{id:'tiny',games:1,wins:1,win_rate:1},{id:'observed',games:100,wins:60,win_rate:.6}],'confidence')[0].id,'observed');
 assert.equal(selectPairs([{id:'a',games:100,wins:50,win_rate:.5,source:'pbe'},{id:'b',games:100,wins:50,win_rate:.5,source:'live'}],false,0).length,1);
 const read=file=>JSON.parse(fs.readFileSync('public/api/version-intel/'+file,'utf8'));
@@ -46,4 +46,17 @@ if(fs.existsSync(equipmentFile)){
   }
  }
 }
-console.log(JSON.stringify({ok:true,patches:index.datasets.map(d=>d.patch),verifiedPairs:pairs,equipmentHeroes,checks:['weighted-global-rates','no-PBE-contamination','hero-denominators','snapshot-consistency','small-sample-ranking','equipment-source-rates-and-unknown-scope']}));
+const referenceFile='public/api/version-intel/tencent-augments.json';let tencentPairs=0;
+if(fs.existsSync(referenceFile)){
+ const reference=JSON.parse(fs.readFileSync(referenceFile,'utf8'));
+ assert.equal(reference.win_rate,null);assert.equal(reference.sample_size,null);assert.equal(reference.mode,'KIWI');
+ for(const hero of reference.heroes)for(const row of hero.augments){
+  tencentPairs++;assert.ok(row.pick_rate>=0&&row.pick_rate<=1);assert.ok(['S','A','B','C'].includes(row.tier));assert.ok(['S','A','B','C'].includes(row.rarity_tier));
+  assert.ok(['silver','gold','prismatic'].includes(row.rarity));assert.ok(reference.dictionary[row.id]);
+  assert.equal('win_rate' in row,false);assert.equal('games' in row,false);
+  const icon=reference.dictionary[row.id].icon_url;if(icon)assert.ok(fs.existsSync('public'+icon));
+ }
+}
+const grades=[{id:'a',source_rank:1,tier:'S',rarity_tier:'B',rarity_rank:2,pick_rate:.1},{id:'b',source_rank:2,tier:'A',rarity_tier:'S',rarity_rank:1,pick_rate:.3}];
+assert.equal(rankTencentAugments(grades,'tier')[0].id,'a');assert.equal(rankTencentAugments(grades,'tier',true)[0].id,'b');assert.equal(rankTencentAugments(grades,'pick_rate')[0].id,'b');assert.equal(grades[0].id,'a');
+console.log(JSON.stringify({ok:true,patches:index.datasets.map(d=>d.patch),verifiedPairs:pairs,equipmentHeroes,tencentPairs,checks:['weighted-global-rates','no-PBE-contamination','hero-denominators','snapshot-consistency','small-sample-ranking','equipment-source-rates-and-unknown-scope','Tencent-tiers-are-not-win-rates','rarity-specific-tiers-kept-separate']}));

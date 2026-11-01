@@ -339,6 +339,52 @@ try {
       await page.getByRole('searchbox',{name:'搜索出装英雄'}).fill('');
       check('Tencent equipment: real source rates, hero changes, sorting, empty search, core/full builds at three widths');
     }
+    await page.getByRole('button',{name:'英雄 × 海克斯',exact:true}).click();
+    await page.getByRole('button',{name:'AramHex · 胜率与样本',exact:true}).click();
+    await page.getByRole('combobox',{name:'选择搭配英雄',exact:true}).selectOption('157');
+    await page.getByRole('combobox',{name:'最少样本',exact:true}).selectOption('0');
+    await page.getByRole('combobox',{name:'情报排序',exact:true}).selectOption('win_rate');
+    await page.getByRole('navigation',{name:'AramHex海克斯稀有度'}).getByRole('button',{name:'黄金',exact:true}).click();
+    await page.locator('.hex-stat-card').first().waitFor();
+    const intelIndex=await json('/api/version-intel/index.json');
+    const overview=await json(`/api/version-intel/${intelIndex.default_patch}/overview.json`);
+    const pairs=await json(`/api/version-intel/${intelIndex.default_patch}/heroes/157.json`);
+    const goldPairs=pairs.pairs.filter(p=>p.source==='live'&&overview.augment_dictionary[p.id].rarity==='gold');
+    assert.equal(await page.locator('.hex-stat-card').count(),Math.min(20,goldPairs.length));
+    assert.equal(await page.locator('.hex-stat-card').first().locator('.hex-card-stats strong').innerText(),(Math.max(...goldPairs.map(p=>p.win_rate))*100).toFixed(1)+'%');
+    for(const width of [1440,390,320]){
+      await page.setViewportSize({width,height:1000});
+      await page.locator('.intel-pair-picker').scrollIntoViewIfNeeded();
+      await fits('aramhex-cards',width);
+      await page.screenshot({path:path.join(out,`aramhex-pairs-${width}.png`)});
+    }
+    check('AramHex augment cards: real win rates, sample filters, rarity filter, three widths');
+    const referenceResponse=await context.request.get(url('/api/version-intel/tencent-augments.json'));
+    if(referenceResponse.ok()){
+      const reference=await referenceResponse.json(),hero=reference.heroes.find(h=>h.id==='157');
+      await page.getByRole('button',{name:'腾讯 · 分档与使用率',exact:true}).click();
+      await page.getByRole('combobox',{name:'选择腾讯海克斯英雄',exact:true}).selectOption('157');
+      await page.getByTestId('tencent-augment-date').waitFor();
+      assert.equal(await page.getByTestId('tencent-augment-date').innerText(),hero.stats_date);
+      const differing=hero.augments.find(row=>row.tier!==row.rarity_tier);
+      assert.ok(differing,'fixture must exercise different overall and rarity source tiers');
+      await page.getByRole('searchbox',{name:'搜索腾讯海克斯',exact:true}).fill(differing.id);
+      const card=page.locator(`[data-augment-id="${differing.id}"]`);
+      assert.equal(await card.locator('.hex-source-tier').innerText(),differing.tier);
+      const rarityLabel={silver:'白银',gold:'黄金',prismatic:'棱彩'}[differing.rarity];
+      await page.getByRole('navigation',{name:'腾讯海克斯稀有度'}).getByRole('button',{name:new RegExp('^'+rarityLabel)}).click();
+      assert.equal(await card.locator('.hex-source-tier').innerText(),differing.rarity_tier);
+      await page.getByRole('searchbox',{name:'搜索腾讯海克斯',exact:true}).fill('');
+      for(const width of [1440,390,320]){
+        await page.setViewportSize({width,height:1000});
+        await page.locator('.tencent-hex-controls').scrollIntoViewIfNeeded();
+        await fits('tencent-augments',width);
+        await page.screenshot({path:path.join(out,`tencent-augments-${width}.png`)});
+      }
+      await page.getByRole('searchbox',{name:'搜索腾讯海克斯',exact:true}).fill('不存在的海克斯');
+      await page.getByText('没有符合条件的海克斯，试试清除筛选。',{exact:true}).waitFor();
+      check('Tencent augments: real pick rates and source tiers, rarity-specific tiers, search, three widths');
+    }
     assert.deepEqual(results.errors, []);
     assert.deepEqual(results.failedResponses, []);
     results.ok = true;
