@@ -213,6 +213,13 @@ def main():
             report['build'] = {'attempted': False, 'reason': 'collect_failed'}
             report['reasons'].append('build_skipped_after_collect_failure')
         else:
+            # Refresh external equipment before the same build. A failed request
+            # preserves the last validated snapshot and does not block personal history.
+            equipment = run(ROOT / 'scripts/sync_version_intel.py', ['--equipment-only'], 240)
+            equipment['ok'] = equipment['exit'] == 0
+            report['equipment'] = equipment
+            if not equipment['ok']:
+                report['reasons'].append('equipment_refresh_failed')
             build = {'attempted': True}
             build.update(run(BUILD_ENTRY, ['--data-only', '--sync'], BUILD_TIMEOUT))
             build['ok'] = build['exit'] == 0

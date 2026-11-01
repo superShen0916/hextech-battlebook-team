@@ -93,12 +93,7 @@ def project(bundle, dataset, seq):
             'global_augment_method': 'Across heroes, sum live final-holder wins and games, then divide; PBE excluded.'}, details
 
 
-def main():
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--offline', action='store_true')
-    parser.add_argument('--cache-dir', type=Path, default=ROOT / 'work/version-intel-cache')
-    parser.add_argument('--output-dir', type=Path, default=ROOT / 'work/players-preview-20261022/public/api/version-intel')
-    args = parser.parse_args()
+def refresh_aramhex(args):
     cache, output = args.cache_dir, args.output_dir
     for name in ('latest.json', 'index.json'):
         if not args.offline:
@@ -120,6 +115,9 @@ def main():
                 raise ValueError(f'Hash or size mismatch: {patch}/{name}')
             bundle[name] = json.loads(raw)
         overview, details = project(bundle, dataset, seq)
+        for aid, entry in overview['augment_dictionary'].items():
+            entry['icon_url'] = ('/assets/augments/' + aid + '.png'
+                                 if (output.parent.parent / 'assets/augments' / (aid + '.png')).is_file() else None)
         pending.append((output / patch / 'overview.json', encode(overview)))
         pending.extend((output / patch / 'heroes' / (hid + '.json'), encode(detail)) for hid, detail in details.items())
         datasets.append({'patch': patch, 'snapshot_at': overview['snapshot_at'],
@@ -130,8 +128,31 @@ def main():
         write(file, raw)
     write(output / 'index.json', encode({'schema_version': 1, 'seq': seq, 'default_patch': latest['patch'],
                                        'source_url': SOURCE, 'license': 'CC BY-NC 4.0', 'datasets': datasets}))
-    print(json.dumps({'ok': True, 'datasets': datasets, 'files': len(pending) + 1,
-                      'bytes': sum(len(raw) for _, raw in pending)}, ensure_ascii=False))
+    return {'ok': True, 'datasets': datasets, 'files': len(pending) + 1,
+            'bytes': sum(len(raw) for _, raw in pending)}
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--offline', action='store_true')
+    parser.add_argument('--equipment-only', action='store_true', help='refresh Tencent KIWI equipment and augment reference')
+    parser.add_argument('--cache-dir', type=Path, default=ROOT / 'work/version-intel-cache')
+    parser.add_argument('--output-dir', type=Path, default=ROOT / 'work/players-preview-20261022/public/api/version-intel')
+    args = parser.parse_args()
+    import sys
+    sys.path.insert(0, str(ROOT / 'app'))
+    from public_site import _exclusive_lock
+    (ROOT / 'work/build').mkdir(parents=True, exist_ok=True)
+    with _exclusive_lock(ROOT / 'work/build/release.lock') as acquired:
+        if not acquired:
+            raise RuntimeError('release_already_running')
+        if args.equipment_only:
+            from tencent_equipment import refresh
+            result = refresh(args.cache_dir, args.output_dir, ROOT / 'app/static',
+                             args.output_dir.parent.parent, offline=args.offline)
+        else:
+            result = refresh_aramhex(args)
+    print(json.dumps(result, ensure_ascii=False))
 
 
 if __name__ == '__main__':

@@ -19,7 +19,8 @@ from release_reuse import mirror_slot, promote
 
 class NightlyPublicationTests(unittest.TestCase):
     def scenario(self, code, fresh, disk=None, manifest_id='new', online=True, collect_code=0,
-                 last_artifact=None, last_build_id='published', upload_enabled=False, upload_error=False):
+                 last_artifact=None, last_build_id='published', upload_enabled=False, upload_error=False,
+                 equipment_code=0):
         with tempfile.TemporaryDirectory() as folder:
             base = Path(folder)
             result, state, reports, release = [base / n for n in ('result.json', 'state.json', 'reports', 'release')]
@@ -35,6 +36,8 @@ class NightlyPublicationTests(unittest.TestCase):
             def run(script, extra, timeout):
                 if script == nightly.COLLECT:
                     return {'exit': collect_code, 'tail': [], 'stderr': ''}
+                if script.name == 'sync_version_intel.py':
+                    return {'exit': equipment_code, 'tail': [], 'stderr': ''}
                 return {'exit': code, 'tail': [], 'stderr': '', 'release_result': fresh}
             with patch.multiple(nightly, ROOT=base, STATE=state, RESULT=result, REPORTS=reports, RELEASE=release), \
                  patch.object(nightly, 'check_database_routes', return_value={}), \
@@ -100,6 +103,17 @@ class NightlyPublicationTests(unittest.TestCase):
         self.assertEqual(exit_code, 1)
         self.assertFalse(report['build']['attempted'])
         self.assertFalse(report['publish']['needed'])
+        self.assertNotIn('equipment', report)
+
+    def test_external_equipment_failure_preserves_personal_build_and_offline_skips_it(self):
+        fresh = {'build_id': 'new', 'artifact_sha256': 'a'*64, 'release_directory_synced': True}
+        code, report, _ = self.scenario(0, fresh, fresh, equipment_code=1)
+        self.assertEqual(code, 0)
+        self.assertTrue(report['build']['ok'])
+        self.assertFalse(report['equipment']['ok'])
+        self.assertIn('equipment_refresh_failed', report['reasons'])
+        _, offline, _ = self.scenario(0, None, online=False)
+        self.assertNotIn('equipment', offline)
 
     def test_same_data_id_still_publishes_a_changed_frontend_artifact(self):
         fresh = {'build_id':'new','artifact_sha256':'a'*64,'release_directory_synced':True}
