@@ -429,6 +429,40 @@ try {
       check('source navigation: isolated categories, remembered views, reload/deep links, legacy equipment link, no AramHex requests from Tencent');
       check('Tencent augments: real pick rates and source tiers, rarity-specific tiers, search, three widths');
     }
+    // A delayed index success must not erase an earlier overview failure after switching sources.
+    const errorPage=await context.newPage();
+    errorPage.setDefaultTimeout(15000);
+    let releaseIndex;
+    try{
+      await errorPage.goto(url('/intel.html'),{waitUntil:'domcontentloaded'});
+      await errorPage.locator('.intel-metrics').waitFor();
+      await errorPage.getByRole('button',{name:'腾讯官方数据',exact:true}).click();
+      let heldIndex;
+      const indexHeld=new Promise(resolve=>{heldIndex=resolve;});
+      const indexGate=new Promise(resolve=>{releaseIndex=resolve;});
+      const indexRoute='**/api/version-intel/index.json*',overviewRoute='**/api/version-intel/*/overview.json*';
+      const index=await json('/api/version-intel/index.json');
+      await errorPage.route(indexRoute,async route=>{
+        heldIndex();await indexGate;
+        // Sentinel option proves the late index result has rendered before the error assertion.
+        await route.fulfill({json:{...index,datasets:[...index.datasets,{...index.datasets[0],patch:'99.99'}]}});
+      });
+      await errorPage.route(overviewRoute,route=>route.fulfill({status:503,json:{error:'expected overview failure'}}));
+      await errorPage.getByRole('button',{name:'AramHex',exact:true}).click();
+      await indexHeld;
+      await errorPage.getByRole('alert').waitFor();
+      assert.ok((await errorPage.getByRole('alert').innerText()).includes('503'));
+      releaseIndex();
+      await errorPage.getByRole('combobox',{name:'统计补丁',exact:true}).getByRole('option',{name:/^99\.99/}).waitFor({state:'attached'});
+      assert.equal(await errorPage.getByRole('alert').count(),1);
+      assert.equal(await errorPage.getByRole('button',{name:'重新读取',exact:true}).isVisible(),true);
+      await errorPage.unroute(indexRoute);await errorPage.unroute(overviewRoute);
+      await errorPage.getByRole('button',{name:'重新读取',exact:true}).click();
+      await errorPage.locator('.intel-metrics').waitFor();
+      await errorPage.locator('.intel-hero-row').first().waitFor();
+      assert.equal(await errorPage.getByRole('alert').count(),0);
+      check('AramHex overview failure remains visible after delayed index success; retry recovers real data');
+    }finally{releaseIndex?.();await errorPage.close();}
     assert.deepEqual(results.errors, []);
     assert.deepEqual(results.failedResponses, []);
     results.ok = true;
