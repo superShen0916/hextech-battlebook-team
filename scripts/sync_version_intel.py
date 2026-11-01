@@ -106,6 +106,7 @@ def main():
         sys.path.insert(0, str(ROOT / 'app'))
         from public_site import _exclusive_lock
         from tencent_equipment import refresh
+        (ROOT / 'work/build').mkdir(parents=True, exist_ok=True)
         with _exclusive_lock(ROOT / 'work/build/release.lock') as acquired:
             if not acquired:
                 raise RuntimeError('release_already_running')

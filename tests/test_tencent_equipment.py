@@ -1,14 +1,18 @@
 import copy
+import gzip
+import io
 import json
 from pathlib import Path
 import sys
 import tempfile
 import unittest
+import urllib.error
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT / 'scripts'), str(ROOT / 'app')]
 import tencent_equipment as equipment
+import sync_version_intel as importer
 
 
 def response(**changes):
@@ -51,6 +55,88 @@ class TencentEquipmentTests(unittest.TestCase):
         hero = equipment.project_hero(body, '202', self.identity)
         self.assertFalse(hero['available'])
         self.assertIsNone(hero['stats_date'])
+
+    def test_missing_or_falsey_fields_cannot_erase_valid_groups(self):
+        for key in ('itemone_json', 'itemcore_json', 'itemshoes', 'itemout', 'itemover_rec'):
+            for value in (None, False, 0, [], 'missing'):
+                body = response()
+                source = json.loads(body['data']['_fieldValues']['unpredictable_key'])
+                if value == 'missing':
+                    del source[key]
+                else:
+                    source[key] = value
+                body['data']['_fieldValues']['unpredictable_key'] = json.dumps(source)
+                with self.subTest(key=key, value=value), self.assertRaises(ValueError):
+                    equipment.project_hero(body, '202', self.identity)
+        for data in (None, [], {'_fieldValues': {'a': None}}, {'_fieldValues': {'a': {}}}):
+            with self.subTest(data=data), self.assertRaises(ValueError):
+                equipment.project_hero({'code': 0, 'data': data}, '202', self.identity)
+
+    def test_fetch_rejects_redirects_and_both_size_limits_and_reads_gzip(self):
+        class Reply(io.BytesIO):
+            def __init__(self, body, url=None, compressed=False):
+                super().__init__(body)
+                self.url = url or equipment.SOURCE + '?championid=202'
+                self.headers = {'Content-Encoding': 'gzip'} if compressed else {}
+        cases = [(Reply(b'{}', url='https://other.example/'), 'unexpected_equipment_redirect'),
+                 (Reply(b'x' * 65), 'equipment_response_too_large'),
+                 (Reply(gzip.compress(b'x' * 65), compressed=True), 'equipment_response_too_large')]
+        for reply, error in cases:
+            with self.subTest(error=error), patch.object(equipment, 'LIMIT', 64), \
+                 patch('urllib.request.urlopen', return_value=reply), self.assertRaisesRegex(ValueError, error):
+                equipment.fetch('202')
+        with patch('urllib.request.urlopen', return_value=Reply(gzip.compress(b'{"code":0}'), compressed=True)):
+            self.assertEqual(equipment.fetch('202'), {'code': 0})
+
+    def test_transport_errors_retry_once_without_real_network_or_wait(self):
+        for error in (OSError('offline'), urllib.error.URLError('offline')):
+            reply = io.BytesIO(b'{"code":0}')
+            reply.url, reply.headers = equipment.SOURCE + '?championid=202', {}
+            with self.subTest(error=error), patch('urllib.request.urlopen', side_effect=[error, reply]) as call, \
+                 patch.object(equipment.time, 'sleep') as sleep:
+                self.assertEqual(equipment.fetch('202'), {'code': 0})
+                self.assertEqual(call.call_count, 2)
+                sleep.assert_called_once_with(1)
+        with patch('urllib.request.urlopen', side_effect=OSError('offline')) as call, \
+             patch.object(equipment.time, 'sleep'), self.assertRaises(OSError):
+            equipment.fetch('202')
+        self.assertEqual(call.call_count, 2)
+
+    def test_fresh_equipment_entry_can_create_and_acquire_its_lock(self):
+        with tempfile.TemporaryDirectory() as folder:
+            base = Path(folder)
+            args = ['sync_version_intel.py', '--equipment-only', '--cache-dir', str(base / 'cache'),
+                    '--output-dir', str(base / 'public/api/version-intel')]
+            with patch.object(importer, 'ROOT', base), patch.object(sys, 'argv', args), \
+                 patch.object(equipment, 'refresh', return_value={'ok': True}) as refresh, \
+                 patch('sys.stdout', new=io.StringIO()):
+                importer.main()
+            refresh.assert_called_once()
+            self.assertTrue((base / 'work/build/release.lock').is_file())
+
+    def test_offline_cache_rebuild_never_requests_network_and_rejects_invalid_cache(self):
+        with tempfile.TemporaryDirectory() as folder:
+            base = Path(folder)
+            cache, output, static = [base / name for name in ('cache', 'output', 'static')]
+            for path in (cache, output, static):
+                path.mkdir()
+            (static / 'champions.json').write_text(json.dumps({'202': self.identity}), encoding='utf-8')
+            (static / 'items.json').write_text('{}', encoding='utf-8')
+            raw = {'retrieved_at': '2026-11-01T00:00:00Z', 'heroes': {'202': response()}}
+            cached = cache / 'tencent-equipment.json'
+            cached.write_text(json.dumps(raw), encoding='utf-8')
+            original = cached.read_bytes()
+            with patch.object(equipment, 'fetch', side_effect=AssertionError('network forbidden')):
+                result = equipment.refresh(cache, output, static, base, offline=True)
+            self.assertTrue(result['ok'])
+            self.assertEqual(cached.read_bytes(), original)
+            published = (output / 'tencent-equipment.json').read_bytes()
+            self.assertEqual(json.loads(published)['heroes'][0]['stats_date'], '2026-10-31')
+            raw['heroes']['202'] = response(itemcore_json=None)
+            cached.write_text(json.dumps(raw), encoding='utf-8')
+            with patch.object(equipment, 'fetch', side_effect=AssertionError('network forbidden')), self.assertRaises(ValueError):
+                equipment.refresh(cache, output, static, base, offline=True)
+            self.assertEqual((output / 'tencent-equipment.json').read_bytes(), published)
 
     def test_unknown_scope_stays_unknown_and_hero_dates_stay_separate(self):
         raw = {'retrieved_at': '2026-11-01T00:00:00Z',

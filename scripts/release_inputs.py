@@ -17,6 +17,7 @@ DATA_SCRIPTS = (
     'detail_bundle.py', 'inject_haido_ratings.py', 'inject_ranked_bounds.py',
     'build_recaps.py',
     'build_weekly.py', 'split_snapshot.py', 'release_inputs.py',
+    'tencent_equipment.py',
 )
 
 

@@ -38,16 +38,26 @@ def option(ids, pick, win, separator, scale=1):
 def payload(body):
     if not isinstance(body, dict) or type(body.get('code')) is not int or body['code'] != 0:
         raise ValueError('tencent_equipment_upstream_error')
-    fields = body.get('data', {}).get('_fieldValues')
+    data = body.get('data')
+    fields = data.get('_fieldValues') if isinstance(data, dict) else None
     if not isinstance(fields, dict) or len(fields) != 1:
         raise ValueError('unexpected_equipment_envelope')
     raw = next(iter(fields.values()))
+    if not isinstance(raw, str):
+        raise ValueError('unexpected_equipment_payload')
     if raw == '':
         return None  # Explicit upstream "no data", distinct from a failed request.
     result = json.loads(raw)
     if not isinstance(result, dict):
         raise ValueError('unexpected_equipment_payload')
     return result
+
+
+def text(source, key):
+    value = source.get(key)
+    if not isinstance(value, str):
+        raise ValueError('missing_equipment_field:' + key)
+    return value
 
 
 def project_hero(body, identifier, identity):
@@ -61,17 +71,17 @@ def project_hero(body, identifier, identity):
         raise ValueError('missing_equipment_date')
     result['stats_date'] = datetime.strptime(day, '%Y%m%d').date().isoformat()
     for target, key, item_key in (('items', 'itemone_json', 'itemone'), ('core', 'itemcore_json', 'itemcore')):
-        rows = json.loads(source.get(key) or '{}')
+        rows = json.loads(text(source, key) or '{}')
         if not isinstance(rows, dict) or any(not re.fullmatch(r'[1-9][0-9]*', rank) for rank in rows):
             raise ValueError('invalid_equipment_rows')
         result[target] = [option(row[item_key], row['showrate'], row['winrate'], '&', 10000)
                           for _, row in sorted(rows.items(), key=lambda pair: int(pair[0]))]
     for target, key in (('boots', 'itemshoes'), ('starting', 'itemout')):
-        for row in (source.get(key) or '').split('#'):
+        for row in text(source, key).split('#'):
             if row:
                 ids, pick, win = row.split('$')
                 result[target].append(option(ids, pick, win, ','))
-    for row in (source.get('itemover_rec') or '').split(';'):
+    for row in text(source, 'itemover_rec').split(';'):
         if row:
             rank, ids, pick, win = row.split('_')
             if not rank.isdigit():
@@ -142,8 +152,11 @@ def refresh(cache, output, static, public, *, offline=False):
         raw = json.loads(path.read_bytes())
     else:
         ids = sorted(champions, key=int)
-        with ThreadPoolExecutor(max_workers=3) as pool:
-            bodies = dict(zip(ids, pool.map(fetch, ids)))
+        pool = ThreadPoolExecutor(max_workers=3)
+        try:
+            bodies = dict(zip(ids, pool.map(fetch, ids), strict=True))
+        finally:
+            pool.shutdown(wait=True, cancel_futures=True)
         raw = {'retrieved_at': datetime.now(timezone.utc).isoformat(timespec='seconds'), 'heroes': bodies}
     data = project(raw, champions, items, lambda iid: (public / 'assets/items' / (iid + '.png')).is_file())
     if not offline:
