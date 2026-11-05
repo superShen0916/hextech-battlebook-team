@@ -36,6 +36,9 @@ ap.add_argument('--ceiling',type=int,default=20000)
 ap.add_argument('--interval',type=float,default=4.0)
 ap.add_argument('--registered-only',action='store_true',
                 help='list every named account registered in the pilot DB instead of the top-N by appearances')
+ap.add_argument('--stop-at-known',type=int,default=1,
+                help='stop paging a player once a whole page is already archived (daily incremental). '
+                     'Pass 0 to walk the full listing window, e.g. when auditing history gaps.')
 ap.add_argument('--out',default=str(PILOT/'teammate-id-listing.json'))
 args=ap.parse_args()
 
@@ -77,7 +80,7 @@ source=TencentSource()
 if source.account['puuid']!=own:raise SystemExit('active_client_account_mismatch')
 
 def list_player(puuid):
-    ids=[];seen=set();pages=[];statuses={}
+    ids=[];seen=set();pages=[];statuses={};stop_early=False
     for start in range(0,args.ceiling,args.page):
         if time.monotonic()-last[0]<args.interval:time.sleep(args.interval-(time.monotonic()-last[0]))
         last[0]=time.monotonic()
@@ -103,14 +106,23 @@ def list_player(puuid):
         ids.extend(page);seen.update(page)
         pages.append({'start':start,'requested':args.page,'returned':len(page)})
         if len(page)<args.page:break
-    return ids,pages,statuses,'available_window_end' if pages and pages[-1]['returned']<args.page else 'ceiling'
+        # Whole page already archived: nothing older can be newer than the top of
+        # what we hold, so the daily queue (`region=ids[:min(positions)]`) is fully
+        # covered already. Paging further only re-downloads a window the queue then
+        # discards: 2026-10-29 run spent 154 requests / 612 s to produce 5 matches.
+        # A new or long-paused account still pages on, because its first pages are
+        # not archived yet.
+        if args.stop_at_known and all(m in known for m in page):stop_early=True;break
+    if pages and pages[-1]['returned']<args.page:return ids,pages,statuses,'available_window_end'
+    return ids,pages,statuses,'stopped_at_known' if stop_early else 'ceiling'
 
 last=[0.0]
 # Second read-only handle: the archive decides whether a listing is the player's
 # whole history or only the most recent window the endpoint exposes.
 archive=sqlite3.connect((DATABASE).as_uri()+'?mode=ro',uri=True)
 report={'started_at':now(),'production_database_written':False,'pilot_database_written':False,
-        'scope':{'top':args.top,'page':args.page,'ceiling':args.ceiling,'interval':args.interval},
+        'scope':{'top':args.top,'page':args.page,'ceiling':args.ceiling,'interval':args.interval,
+                 'stop_at_known':bool(args.stop_at_known)},
         'gopher_puuid':gopher,'known_match_keys':len(known),'teammates':[]}
 allnew=set()
 for n,puuid in candidates:
@@ -119,10 +131,15 @@ for n,puuid in candidates:
     allnew.update(new)
     archived,started=archive_index(archive,puuid)
     window=classify_window(ids,started,archived,listed_at_ms=time.time()*1000)
+    # Marked separately from the upstream window shape: when paging stopped early the
+    # listing is deliberately short, so `history_complete` and
+    # `archived_missing_inside_window` describe our own stopping point, not a
+    # truncation by SGP. Anything auditing history depth must run --stop-at-known 0.
+    window['listing_stopped_early']=reason=='stopped_at_known'
     window.pop('older_archived_ids',None);window.pop('inside_window_missing_ids',None)
     report['teammates'].append({'puuid':puuid,'game_name':names[puuid][0],'tag_line':names[puuid][1],
         'games_with_gopher':n,'listed':len(ids),'ids':ids,'new_vs_pilot_matches':len(new),'pages':pages,
-        'http_counts':statuses,'end_reason':reason,'window':window})
+        'http_counts':statuses,'end_reason':reason,'stopped_early':reason=='stopped_at_known','window':window})
     print(json.dumps({'game_name':names[puuid][0],'listed':len(ids),'new':len(new),'end':reason,
         'window':window['status'],'older_archived':window['archived_beyond_window'],
         'missing_inside':window['archived_missing_inside_window'],'http':statuses},ensure_ascii=False),flush=True)

@@ -7,6 +7,8 @@ import argparse
 import hashlib
 import json
 from pathlib import Path
+import shutil
+import subprocess
 import urllib.request
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -16,7 +18,26 @@ FILES = ('meta.json', 'heroes.json', 'hero_augments.json', 'augments.json')
 
 
 def download(path):
-    request = urllib.request.Request(RAW + path, headers={'User-Agent': 'HextechBattlebook/1.0'})
+    """Fetch one published file, preferring the system curl.
+
+    Python's OpenSSL stack intermittently aborts the TLS handshake against the
+    GitHub raw host on this machine (about 1 success in 8 attempts through the
+    local proxy), while the Windows curl build succeeds every time. curl is used
+    first, urllib stays as the portable fallback, and the caller still verifies
+    size and SHA256 before anything is written.
+    """
+    url = RAW + path
+    curl = shutil.which('curl')
+    if curl:
+        try:
+            result = subprocess.run([curl, '-fsSL', '--max-time', '60',
+                                     '-A', 'HextechBattlebook/1.0', url],
+                                    capture_output=True, timeout=90)
+            if result.returncode == 0 and result.stdout:
+                return result.stdout
+        except (OSError, subprocess.SubprocessError):
+            pass
+    request = urllib.request.Request(url, headers={'User-Agent': 'HextechBattlebook/1.0'})
     with urllib.request.urlopen(request, timeout=40) as response:
         return response.read()
 
@@ -136,6 +157,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--offline', action='store_true')
     parser.add_argument('--equipment-only', action='store_true', help='refresh Tencent KIWI equipment and augment reference')
+    parser.add_argument('--all', action='store_true',
+                        help='refresh both AramHex community samples and Tencent equipment; used by the nightly chain')
     parser.add_argument('--cache-dir', type=Path, default=ROOT / 'work/version-intel-cache')
     parser.add_argument('--output-dir', type=Path, default=ROOT / 'work/players-preview-20261022/public/api/version-intel')
     args = parser.parse_args()
@@ -146,7 +169,23 @@ def main():
     with _exclusive_lock(ROOT / 'work/build/release.lock') as acquired:
         if not acquired:
             raise RuntimeError('release_already_running')
-        if args.equipment_only:
+        if args.all:
+            # Two independent public sources. A failure in one must not hide the
+            # other's result, so both are attempted and reported separately.
+            from tencent_equipment import refresh
+            result = {'ok': True}
+            try:
+                result['aramhex'] = refresh_aramhex(args)
+            except Exception as error:  # noqa: BLE001 - reported, keeps Tencent going
+                result['aramhex'] = {'ok': False, 'error': type(error).__name__ + ':' + str(error)[:200]}
+                result['ok'] = False
+            try:
+                result['equipment'] = refresh(args.cache_dir, args.output_dir, ROOT / 'app/static',
+                                              args.output_dir.parent.parent, offline=args.offline)
+            except Exception as error:  # noqa: BLE001 - reported, snapshot retained
+                result['equipment'] = {'ok': False, 'error': type(error).__name__ + ':' + str(error)[:200]}
+                result['ok'] = False
+        elif args.equipment_only:
             from tencent_equipment import refresh
             result = refresh(args.cache_dir, args.output_dir, ROOT / 'app/static',
                              args.output_dir.parent.parent, offline=args.offline)

@@ -20,7 +20,7 @@ from release_reuse import mirror_slot, promote
 class NightlyPublicationTests(unittest.TestCase):
     def scenario(self, code, fresh, disk=None, manifest_id='new', online=True, collect_code=0,
                  last_artifact=None, last_build_id='published', upload_enabled=False, upload_error=False,
-                 equipment_code=0):
+                 intel_code=0, intel_change=False):
         with tempfile.TemporaryDirectory() as folder:
             base = Path(folder)
             result, state, reports, release = [base / n for n in ('result.json', 'state.json', 'reports', 'release')]
@@ -37,11 +37,13 @@ class NightlyPublicationTests(unittest.TestCase):
                 if script == nightly.COLLECT:
                     return {'exit': collect_code, 'tail': [], 'stderr': ''}
                 if script.name == 'sync_version_intel.py':
-                    return {'exit': equipment_code, 'tail': [], 'stderr': ''}
+                    return {'exit': intel_code, 'tail': [], 'stderr': ''}
                 return {'exit': code, 'tail': [], 'stderr': '', 'release_result': fresh}
+            prints = ['before', 'after'] if intel_change else ['same', 'same']
             with patch.multiple(nightly, ROOT=base, STATE=state, RESULT=result, REPORTS=reports, RELEASE=release), \
                  patch.object(nightly, 'check_database_routes', return_value={}), \
                  patch.object(nightly, 'client_status', return_value={'online': online}), \
+                 patch.object(nightly, 'intel_fingerprint', side_effect=list(prints)), \
                  patch.object(nightly, 'run', side_effect=run), \
                  patch.object(nightly, 'retired_builds', return_value={'count': 0, 'mb': 0}), \
                  patch('team_data.publish', side_effect=RuntimeError('upload interrupted') if upload_error else None,
@@ -103,17 +105,36 @@ class NightlyPublicationTests(unittest.TestCase):
         self.assertEqual(exit_code, 1)
         self.assertFalse(report['build']['attempted'])
         self.assertFalse(report['publish']['needed'])
-        self.assertNotIn('equipment', report)
+        self.assertTrue(report['intel']['ok'])
 
-    def test_external_equipment_failure_preserves_personal_build_and_offline_skips_it(self):
+    def test_intel_refresh_runs_without_the_client_and_only_builds_when_it_changed(self):
         fresh = {'build_id': 'new', 'artifact_sha256': 'a'*64, 'release_directory_synced': True}
-        code, report, _ = self.scenario(0, fresh, fresh, equipment_code=1)
+        # Client offline and no new intel content: refresh is still recorded, no build.
+        code, report, _ = self.scenario(0, None, online=False)
+        self.assertEqual(code, 0)
+        self.assertTrue(report['intel']['ok'])
+        self.assertFalse(report['intel']['changed'])
+        self.assertFalse(report['build']['attempted'])
+        self.assertFalse(report['publish']['needed'])
+        # Client offline but the intel snapshot moved: rebuild and publish data only.
+        code, report, _ = self.scenario(0, fresh, fresh, online=False, intel_change=True)
+        self.assertEqual(code, 0)
+        self.assertTrue(report['intel']['changed'])
+        self.assertTrue(report['build']['ok'])
+        self.assertIn('intel_only_build', report['reasons'])
+        self.assertTrue(report['publish']['needed'])
+        self.assertFalse(report['collect']['attempted'])
+
+    def test_intel_failure_preserves_personal_build_and_offline_skips_the_build(self):
+        fresh = {'build_id': 'new', 'artifact_sha256': 'a'*64, 'release_directory_synced': True}
+        code, report, _ = self.scenario(0, fresh, fresh, intel_code=1)
         self.assertEqual(code, 0)
         self.assertTrue(report['build']['ok'])
-        self.assertFalse(report['equipment']['ok'])
-        self.assertIn('equipment_refresh_failed', report['reasons'])
-        _, offline, _ = self.scenario(0, None, online=False)
-        self.assertNotIn('equipment', offline)
+        self.assertFalse(report['intel']['ok'])
+        self.assertFalse(report['intel']['changed'])
+        self.assertIn('intel_refresh_failed', report['reasons'])
+        _, offline, _ = self.scenario(0, None, online=False, intel_code=1)
+        self.assertFalse(offline['build']['attempted'])
 
     def test_same_data_id_still_publishes_a_changed_frontend_artifact(self):
         fresh = {'build_id':'new','artifact_sha256':'a'*64,'release_directory_synced':True}

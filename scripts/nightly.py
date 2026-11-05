@@ -14,10 +14,14 @@
   python scripts/nightly.py --mark-published  # 发布成功后回写，避免重复发布
 
 退出码：0 完成（含客户端不在的降级）/ 1 失败。
+
+版本情报（AramHex 社区样本 + 腾讯出装/海克斯）来自公开来源，不依赖游戏客户端，
+因此每晚无条件刷新；只要内容真的变了，客户端没登录也照常构建一份。
 """
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 import subprocess
@@ -47,6 +51,7 @@ STATE = ROOT / 'work/build/nightly-state.json'
 REPORTS = ROOT / 'outputs/nightly'
 COLLECT_TIMEOUT = 3600
 BUILD_TIMEOUT = 2400
+INTEL_TIMEOUT = 900
 KEEP_REPORTS = 90
 
 
@@ -116,6 +121,25 @@ def prune_reports():
             path.unlink(missing_ok=True)
     except OSError:
         pass
+
+
+def intel_fingerprint():
+    """Hash every projected version-intel file so a no-op refresh is detectable.
+
+    Returns None only when the folder cannot be read; an empty folder still yields
+    a stable digest, so a first-time refresh counts as a change.
+    """
+    folder = ROOT / 'work/players-preview-20261022/public/api/version-intel'
+    digest = hashlib.sha256()
+    try:
+        paths = sorted(p for p in folder.rglob('*') if p.is_file())
+        for path in paths:
+            digest.update(path.relative_to(folder).as_posix().encode('utf-8'))
+            digest.update(b'\0')
+            digest.update(hashlib.sha256(path.read_bytes()).digest())
+    except OSError:
+        return None
+    return digest.hexdigest()
 
 
 def retired_builds():
@@ -190,7 +214,18 @@ def main():
         else:
             report['client'] = client_status()
 
-        # 3. 采集（仅在客户端在线时）
+        # 3. 版本情报：公开来源，和游戏客户端无关，每晚无条件刷新。
+        #    用目录指纹判断这次刷新是否真的带来新内容，作为离线时是否构建的依据。
+        intel_before = intel_fingerprint()
+        intel = run(ROOT / 'scripts/sync_version_intel.py', ['--all'], INTEL_TIMEOUT)
+        intel['ok'] = intel['exit'] == 0
+        intel_after = intel_fingerprint()
+        intel['changed'] = bool(intel['ok'] and intel_before and intel_after and intel_before != intel_after)
+        report['intel'] = intel
+        if not intel['ok']:
+            report['reasons'].append('intel_refresh_failed')
+
+        # 4. 采集（仅在客户端在线时）
         collect = {'attempted': False}
         if args.skip_collect:
             collect['reason'] = 'skipped_by_flag'
@@ -204,22 +239,21 @@ def main():
                 report['reasons'].append('collect_exit_%d' % collect['exit'])
         report['collect'] = collect
 
-        # 4. 构建。采集失败默认不进构建，避免把不完整的采集当成功发布。
+        # 5. 构建。采集失败默认不进构建，避免把不完整的采集当成功发布。
         blocked = collect.get('attempted') and not collect.get('ok') and not args.build_anyway
-        if not args.skip_collect and not report['client'].get('online'):
-            report['build'] = {'attempted': False, 'reason': 'client_not_running'}
+        client_online = bool(report['client'].get('online'))
+        intel_updated = bool((report.get('intel') or {}).get('changed'))
+        if not args.skip_collect and not client_online and not intel_updated:
+            report['build'] = {'attempted': False, 'reason': 'client_not_running_and_intel_unchanged'}
             report['reasons'].append('client_not_logged_in')
         elif blocked:
             report['build'] = {'attempted': False, 'reason': 'collect_failed'}
             report['reasons'].append('build_skipped_after_collect_failure')
         else:
-            # Refresh external equipment before the same build. A failed request
-            # preserves the last validated snapshot and does not block personal history.
-            equipment = run(ROOT / 'scripts/sync_version_intel.py', ['--equipment-only'], 240)
-            equipment['ok'] = equipment['exit'] == 0
-            report['equipment'] = equipment
-            if not equipment['ok']:
-                report['reasons'].append('equipment_refresh_failed')
+            if not client_online and not args.skip_collect:
+                # Only reachable when the intel refresh changed content: rebuild the
+                # published data without touching personal records.
+                report['reasons'].append('intel_only_build')
             build = {'attempted': True}
             build.update(run(BUILD_ENTRY, ['--data-only', '--sync'], BUILD_TIMEOUT))
             build['ok'] = build['exit'] == 0

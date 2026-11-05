@@ -25,9 +25,12 @@ PBE参考数据单独标记，默认不进入正式服全局榜，主动开启�
 .\Run-Python.cmd scripts/sync_version_intel.py --offline
 .\Run-Python.cmd scripts/sync_version_intel.py --equipment-only
 .\Run-Python.cmd scripts/sync_version_intel.py --equipment-only --offline
+.\Run-Python.cmd scripts/sync_version_intel.py --all
 ```
 
 缓存位于 `work/version-intel-cache`，投影输出至唯一前端的 `public/api/version-intel`。两种来源的导入都取得现有release锁。AramHex导入验证文件哈希、大小、版本路径、计数和配对边界，之后通过标准构建发布。
+
+`--all` 依次刷新两个来源，单个失败不影响另一个，输出分别带 `aramhex` 与 `equipment` 结果；夜间链路用的就是这一个入口。两个来源都是公开数据，与游戏客户端登录无关，所以夜间任务在客户端未登录时仍会刷新它们，只有内容真的变了才额外构建一份（报告里标 `intel_only_build`）。AramHex 走 GitHub raw，本机 Python 的 TLS 连接对该主机会间歇中断（实测约 1/8 成功），因此下载优先用系统 curl，urllib 仅作回退，取回内容仍要过大小与 SHA256 校验。
 
 每版本概览与每英雄明细分片加载。切换版本或英雄时中止旧请求，并核对patch、hero_id与snapshot_at，避免混用不同版本。
 
