@@ -2,45 +2,45 @@ import {useEffect,useLayoutEffect,useRef,useState,type ReactNode} from 'react';
 import {createPortal} from 'react-dom';
 import type {Rank,RankQueue} from './App';
 
-// 排位段位只作背景参考：它来自官方排位接口与排位攀登挑战 210004，
-// 只能证明"至少达到过"，既不覆盖账号全部年代，也不参与海斗分。
+// 只展示「当前赛季段位」：来自官方排位接口，是本季实时的段位与胜点。
+// 早期那套「历史至少达到过某段位」的下界统计口径不可靠，已从界面撤掉；
+// 保留这段提示的真正目的是说清一件事：海斗分不参考段位，也不代表真实实力。
 const QUEUE_LABEL:{[key:string]:string}={solo:'单双排',flex:'灵活组排'};
-const MISSING='暂无可靠段位记录 · 没查到不等于没打过排位';
+const QUEUES=['solo','flex'] as const;
+const MISSING='本季暂无段位记录';
+const MISSING_BOTH='本季两个队列都没有段位读数 · 没查到不等于没打过排位';
 const GAP=10;
 
 const text=(value?:string|null)=>typeof value==='string'?value.trim():'';
 
+/** 当前赛季段位：只认官方排位接口返回的 current，没有就是没有，不拿别的字段凑。 */
 export function queueParts(queue?:RankQueue|null){
-  if(!queue) return null;
-  const atLeast=text(queue.at_least),current=text(queue.current);
-  const lp=typeof queue.lp==='number'?`${queue.lp} 胜点`:'';
-  if(!atLeast&&!current) return null;
-  const bound=atLeast?`历史至少 ${atLeast}`:'';
-  // 下界与当前段位相同时不重复段位名，只补胜点。
-  const now=current?(atLeast===current?(lp?`当前 ${lp}`:''):(lp?`当前 ${current} · ${lp}`:`当前 ${current}`)):'';
-  return {bound,now};
+  const tier=text(queue?.current);
+  if(!tier) return null;
+  const lp=typeof queue?.lp==='number'?`${queue.lp} 胜点`:'';
+  return {tier,lp};
 }
 
 export function queueLine(queue?:RankQueue|null){
   const parts=queueParts(queue);
   if(!parts) return null;
-  return [parts.bound,parts.now].filter(Boolean).join(' · ');
+  return parts.lp?`${parts.tier} · ${parts.lp}`:parts.tier;
 }
 
-/** 档案页常驻一行：句子里已经带了队列名，所以去掉重复的"历史至少"。 */
+/** 档案页常驻一行：优先单双排，本季没打单双排就退到灵活组排，两个都没有返回 null。 */
 export function rankSummary(rank?:Rank|null){
-  const combined=queueLine(rank?.solo);
-  return combined?combined.replace('历史至少 ','至少 '):null;
+  const solo=queueLine(rank?.solo);
+  if(solo) return solo;
+  const flex=queueLine(rank?.flex);
+  return flex?`灵活组排 ${flex}`:null;
 }
 
 export function rankPlainText(rank?:Rank|null){
-  const rows:string[]=[];
-  for(const key of ['solo','flex'] as const){
-    if(key==='flex'&&!rank?.flex) continue;
-    rows.push(`${QUEUE_LABEL[key]}：${queueLine(rank?.[key])??MISSING}`);
-  }
+  // 两个队列都没读数时不再逐队列重复两遍「暂无」，合成一句，避免看起来像缺数据。
+  const anyQueue=QUEUES.some(key=>queueParts(rank?.[key]));
+  const rows=anyQueue?QUEUES.map(key=>`${QUEUE_LABEL[key]}：${queueLine(rank?.[key])??MISSING}`):[MISSING_BOTH];
   return ['海斗分只统计本站收录的海克斯大乱斗对局，不参考排位段位，也不代表真实实力。',
-    ...rows,'段位取自官方排位接口与排位挑战记录，只证明「至少达到过」，不是完整生涯最高。'].join('\n');
+    '当前赛季排位：',...rows].join('\n');
 }
 
 type Anchor={left:number;top:number;bottom:number};
@@ -49,7 +49,7 @@ export default function RankHint({rank,className,children}:{rank?:Rank|null;clas
   const trigger=useRef<HTMLDivElement>(null);
   const tip=useRef<HTMLDivElement>(null);
   const[anchor,setAnchor]=useState<Anchor|null>(null);
-  const[height,setHeight]=useState(190);
+  const[height,setHeight]=useState(170);
   const close=()=>setAnchor(null);
   // 先按估算高度摆位，挂载后按真实高度纠偏，避免小屏把最后一句话裁掉。
   useLayoutEffect(()=>{
@@ -79,19 +79,19 @@ export default function RankHint({rank,className,children}:{rank?:Rank|null;clas
     // 优先放到卡片下方；下方放不下且上方更宽裕时才上移，尽量不盖住正在看的卡片。
     return below>=height||above<height?{left,top:anchor.bottom+GAP}:{left,bottom:window.innerHeight-anchor.top+GAP};
   })():null;
+  const checked=text(rank?.checked_at);
   // 不要挂 title：桌面端会同时弹出原生提示条，和自定义悬浮框叠在一起。
   // 读屏和触屏改用 aria-label，文案与悬浮框一致。
   return <div ref={trigger} className={className} role="group" aria-label={rankPlainText(rank)} onMouseEnter={open} onMouseLeave={close}>
     {children}
     {anchor&&style&&createPortal(<div ref={tip} className="rank-tip" role="tooltip" style={style}>
       <p className="rank-tip-title">海斗分 ≠ 排位实力</p>
-      <p className="rank-tip-lede">海斗分只统计本站收录的海克斯大乱斗对局，<b>不参考排位段位</b>，也不代表真实实力。</p>
-      <ul className="rank-tip-rows">{(['solo','flex'] as const).map(key=>{
-        if(key==='flex'&&!rank?.flex) return null;
+      <p className="rank-tip-lede">海斗分只统计本站收录的海克斯大乱斗对局，<b>与排位段位无关</b>，也不代表真实实力。</p>
+      <ul className="rank-tip-rows">{QUEUES.some(key=>queueParts(rank?.[key]))?QUEUES.map(key=>{
         const parts=queueParts(rank?.[key]);
-        return <li key={key}><span>{QUEUE_LABEL[key]}</span>{parts?<strong>{parts.bound||parts.now}{parts.bound&&parts.now&&<small>{parts.now}</small>}</strong>:<em>{MISSING}</em>}</li>;
-      })}</ul>
-      <p className="rank-tip-note">段位取自官方排位接口与排位挑战记录，只证明「至少达到过」，不是完整生涯最高。</p>
+        return <li key={key}><span>{QUEUE_LABEL[key]}</span>{parts?<strong>{parts.tier}{parts.lp&&<small>{parts.lp}</small>}</strong>:<em>{MISSING}</em>}</li>;
+      }):<li><span>当前赛季</span><em>{MISSING_BOTH}</em></li>}</ul>
+      <p className="rank-tip-note">{checked?`段位为当前赛季排位接口读数（${checked}），赛季结算或补分会变；只作背景参考，不进海斗分。`:'段位为当前赛季排位接口读数，只作背景参考，不进海斗分。'}</p>
     </div>,document.body)}
   </div>;
 }
