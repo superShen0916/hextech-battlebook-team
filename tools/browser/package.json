@@ -4,5 +4,5 @@
   "version": "1.0.0",
   "type": "module",
   "description": "Shared Codex and WorkBuddy browser checks; uses installed Chrome or Edge.",
-  "devDependencies": {"playwright-core": "1.62.1"}
+  "devDependencies": {"playwright-core": "1.64.1"}
 }
