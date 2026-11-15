@@ -1,4 +1,4 @@
-import { ChampionshipHero } from "./Championship";
+import { ChampionshipHero, ChampionshipPoster } from "./Championship";
 import {useEffect,useState} from 'react';
 import LobbyNav from './LobbyNav';
 import useSectionNavigation from './useSectionNavigation';
@@ -39,8 +39,12 @@ export default function Lobby({snapshot,profiles,dictionary,visuals,preferences,
  const used=new Set<string>();const choose=(rows:typeof moments)=>{const unique=rows.filter(r=>!used.has(r.profile.id));const pool=unique.length?unique:rows;const firstByPlayer=new Map<string,(typeof moments)[number]>();for(const r of pool)if(!firstByPlayer.has(r.profile.id))firstByPlayer.set(r.profile.id,r);const byPlayer=[...firstByPlayer.values()];const row=byPlayer[memory%Math.max(1,byPlayer.length)];if(row)used.add(row.profile.id);return row;};
  const selected=[choose(penta),choose(damage),choose(kills)];
  const highlights=selected.map((row,i)=>({row,label:['五杀时刻','输出名场面','收割现场'][i],value:row?(i===0?n(row.match.player.penta_kills)+' 次五杀':i===1?n((row.match.player.damage||0)/10000,1)+' 万伤害':n(row.match.player.kills)+' 次击杀'):'暂无记录'}));
- return <main className="site-shell lobby-site experience-v2 championship-lobby">
+ return <main className="lobby-site experience-v2 championship-lobby">
+ <div className="site-shell lobby-shell">
  <header className="club-header"><a className="club-brand" href="/"><span className="club-logo">⬡</span><span>海克斯战报馆<small>HEXTECH BATTLEBOOK</small></span></a><nav aria-label="大厅导航">{[["players","玩家大厅"],["together","并肩档案"],["recaps","当晚战报"],["achievements","朋友成就"],["moments","高光回顾"]].map(([id,label])=><a key={id} className={navigation.active===id?"current":""} aria-current={navigation.active===id?"location":undefined} href={"#"+id} onClick={()=>jumped(id)}>{label}</a>)}</nav><div className="header-personal"><VisitorMenu profiles={profiles} preferences={preferences} save={save} onChoose={onChoose}/><span className="preview-label">BLG 冠军版</span></div></header>
+ </div>
+ <ChampionshipPoster />
+ <div className="site-shell lobby-shell">
  <ChampionshipHero>
    {self
      ? <button className="button championship-primary" onClick={() => onChoose(self.id)}>打开我的战报 <span aria-hidden="true">↗</span></button>
@@ -55,5 +59,8 @@ export default function Lobby({snapshot,profiles,dictionary,visuals,preferences,
  <AchievementHall dataUrl={snapshot.achievements_url} profiles={profiles} dictionary={dictionary} visuals={visuals} onChoose={onChoose} onMatch={onMatch}/>
  <section className="lobby-moments" id="moments"><div className="lobby-section-head"><div><p className="section-kicker">EVERYONE HAS THEIR MOMENT</p><h2>这波不录下来，可惜了</h2></div><button className="ghost memory-shuffle" onClick={()=>{track('lobby_shuffle',{detail:JSON.stringify({page:memory+1})});setMemory(memory+1)}}>再翻一页黑历史 ↻</button></div><p className="lobby-scope">从各自已收录的有效样本中挑选代表对局，尽量让不同玩家登场；不作实力排名。</p><div className="moment-grid">{highlights.map(({row,label,value})=><button className="moment-tile signature-moment" key={label} disabled={!row} onClick={()=>row&&onMatch(row.profile.id,row.match)} style={row?visualStyle(row.profile,preferences):undefined}><div className="moment-art" aria-hidden="true" style={{backgroundImage:row&&visuals[row.profile.id]?.splash_url?`url("${visuals[row.profile.id].splash_url}")`:undefined}}/><span className="moment-label">{label}</span><strong>{value}</strong>{row&&<><span className="moment-hero">{heroName(row.match.player,dictionary)}</span><span className="moment-person"><Portrait profile={row.profile} visual={visuals[row.profile.id]}/><span>{row.profile.name}<small>{day(row.match.started_ms)} · {row.profile.history_scope==='shared'?'同队样本':'个人历史'}</small></span></span></>}<span className="moment-link">回看这场 ↗</span></button>)}</div></section>
  <section className="lobby-recent" id="lobby-recent"><div className="lobby-section-head"><div><p className="section-kicker">RECENT GAMES</p><h2>说好最后一把，怎么又开了</h2></div><span className="section-context">来自已接入的个人历史 · 同场合并</span></div><div className="lobby-game-list">{recent.map(({match,people})=><article className="lobby-game" key={match.id}><div className="lobby-game-date"><strong>{day(match.started_ms)}</strong><span>{day(match.started_ms,true).split(' ').at(-1)} · {n((match.duration||0)/60)} 分钟</span></div><div className="lobby-game-people">{people.map(({profile,match:m})=><button key={profile.id} onClick={()=>onMatch(profile.id,m)}><Portrait profile={profile} visual={visuals[profile.id]}/><span className="game-person-name">{profile.name}<small>{heroName(m.player,dictionary)} · {n(m.player.kills)} / {n(m.player.deaths)} / {n(m.player.assists)}</small></span><span className={'result-tag '+(m.player.win?'win':'loss')}>{m.player.win?'胜':'负'}</span></button>)}</div><button className="text-button" onClick={()=>onMatch(people[0].profile.id,people[0].match)}>看战报 ↗</button></article>)}</div></section>
- <footer className="club-footer"><div className="club-brand"><span className="club-logo">⬡</span><span>海克斯战报馆<small>一起打过的每一场，都值得记住。</small></span></div><p>标准海克斯大乱斗 · 更新于 {snapshot.updated_at?day(new Date(snapshot.updated_at).getTime()):'—'}<br/>仅展示已收录战绩；MVP / ACE 为工具自评。<br/><a className="championship-footer-link" href="#championship-week">BLG 夺冠周活动 ↑</a></p></footer><LobbyNav {...navigation}/></main>;
+ <footer className="club-footer"><div className="club-brand"><span className="club-logo">⬡</span><span>海克斯战报馆<small>一起打过的每一场，都值得记住。</small></span></div><p>标准海克斯大乱斗 · 更新于 {snapshot.updated_at?day(new Date(snapshot.updated_at).getTime()):'—'}<br/>仅展示已收录战绩；MVP / ACE 为工具自评。<br/><a className="championship-footer-link" href="#championship-week">BLG 夺冠周活动 ↑</a></p></footer>
+ </div>
+ <LobbyNav {...navigation}/>
+ </main>;
 }
