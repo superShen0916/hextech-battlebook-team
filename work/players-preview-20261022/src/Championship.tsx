@@ -7,6 +7,7 @@ import './championship.css';
 
 const activityDates = '11 月 16 日–22 日';
 const activityTitle = '所有战绩海斗分额外翻倍';
+const posterSource = 'https://x.com/BilibiliGaming/status/2121764046714360169/photo/2';
 const series = [
   { game: 1, winner: 'GEN' },
   { game: 2, winner: 'BLG' },
@@ -20,16 +21,18 @@ export function ChampionshipHero({ children }: { children: ReactNode }) {
   return (
     <div className="championship-feature">
       <section className="championship-hero" aria-labelledby="championship-title">
-        <picture className="championship-picture">
-          <source media="(max-width: 740px)" srcSet={mobileArt} />
-          <img src={desktopArt} width="1672" height="941" alt="" fetchPriority="high" />
-        </picture>
+        <figure className="championship-art">
+          <picture>
+            <source media="(max-width: 740px)" srcSet={mobileArt} />
+            <img src={desktopArt} width="1920" height="1072" alt="BLG 选手身穿队服合影，海报写着「我们是冠军！」" fetchPriority="high" />
+          </picture>
+          <figcaption><a href={posterSource} target="_blank" rel="noreferrer">BLG 俱乐部官方冠军海报 ↗</a></figcaption>
+        </figure>
         <div className="championship-copy">
           <p className="championship-kicker">2026 英雄联盟全球总决赛</p>
-          <h1 id="championship-title"><span>BLG</span>我们是冠军！</h1>
-          <div className="championship-result" aria-label="决赛比分，BLG 三比一战胜 GEN">
+          <h1 className="championship-result" id="championship-title" aria-label="决赛比分，BLG 三比一战胜 GEN">
             <b>BLG</b><strong>3<span>:</span>1</strong><b>GEN</b>
-          </div>
+          </h1>
           <ol className="championship-series" aria-label="决赛各局胜者">
             {series.map(({ game, winner }) => (
               <li key={game} data-winner={winner} aria-label={`第 ${game} 局，${winner} 获胜`}>
@@ -40,11 +43,11 @@ export function ChampionshipHero({ children }: { children: ReactNode }) {
           <div className="championship-actions">
             {children}
             <a href="#championship-week">夺冠周活动 <span aria-hidden="true">↓</span></a>
+            <button className="championship-celebrate" type="button" onClick={() => setBurst(value => value + 1)}>
+              <span aria-hidden="true">✦</span> 放礼花
+            </button>
           </div>
         </div>
-        <button className="championship-celebrate" type="button" onClick={() => setBurst(value => value + 1)}>
-          <span aria-hidden="true">✦</span> 放礼花
-        </button>
         {burst > 0 && (
           <div className="championship-confetti" aria-hidden="true" key={burst}>
             {Array.from({ length: 30 }, (_, i) => (

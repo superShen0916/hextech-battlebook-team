@@ -1,27 +1,108 @@
 .championship-lobby {
   --blg-ice: #9aebff;
   --blg-pink: #ff96ce;
+  --blg-gold: #f3d9a2;
 }
 
-body:has(.championship-lobby) {
-  background: radial-gradient(ellipse at 90% 14%, #12283d 0, transparent 44rem),
-              radial-gradient(ellipse at 4% 38%, #29152f 0, transparent 48rem), #080d19;
+html[data-skin="blg"] body:has(.championship-lobby) {
+  background: radial-gradient(ellipse at 92% 5%, #183750 0, transparent 50rem),
+              radial-gradient(ellipse at 2% 22%, #3b203b 0, transparent 47rem),
+              radial-gradient(ellipse at 90% 64%, #102c46 0, transparent 57rem), #080e1c;
 }
 
-.championship-lobby .club-header,
-.championship-lobby .club-footer {
-  border-color: #8db5fa32;
+html[data-skin="blg"] .championship-lobby {
+  --gold: #f5dba5;
+  --line: #89acd34d;
+  --scene-accent: #b9f0ff;
+  --scene-panel: #1a2741;
+  --scene-ink: #10162b;
+  --scene-line: #9dbdf65e;
 }
 
-.championship-lobby .club-brand .club-logo,
-.championship-lobby .club-header nav .current,
-.championship-lobby .lobby-section-head .section-kicker {
+html[data-skin="blg"] .championship-lobby :is(.club-header, .club-footer) {
+  border-image: linear-gradient(90deg, #f8badf90, #f3d9a257, #9aebff90) 1;
+}
+
+html[data-skin="blg"] .championship-lobby .club-brand .club-logo {
+  width: 45px;
+  flex: 0 0 45px;
+  color: transparent;
+  background: url('./media/blg-team.webp') center / contain no-repeat;
+  filter: drop-shadow(0 0 11px #59cdf850);
+}
+
+html[data-skin="blg"] .championship-lobby .club-header nav :is(.current, a:hover),
+html[data-skin="blg"] .championship-lobby .lobby-section-head .section-kicker {
   color: var(--blg-ice);
+}
+
+html[data-skin="blg"] .championship-lobby .lobby-section-head {
+  position: relative;
+  padding-top: 12px;
+}
+
+html[data-skin="blg"] .championship-lobby .lobby-section-head::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto auto 0;
+  width: 42px;
+  height: 2px;
+  background: linear-gradient(90deg, var(--blg-pink), var(--blg-ice));
+}
+
+html[data-skin="blg"] .championship-lobby .club-header .preview-label {
+  border-color: #e29ece62;
+  background: #412c47;
+  color: #ffdcf2;
+}
+
+html[data-skin="blg"] .championship-lobby :is(.roster-tabs, .hall-mode-switch) button[aria-pressed="true"] {
+  border-color: #ffc9e484;
+  background: linear-gradient(110deg, #552e53, #1b4b62);
+  color: #fff1f9;
+}
+
+html[data-skin="blg"] .championship-lobby .hall-arena {
+  border-color: #bd9dc975;
+  background: radial-gradient(ellipse at 16% 0, #50234394, transparent 53%),
+              radial-gradient(ellipse at 90% 0, #14506b94, transparent 49%), #111a30;
+}
+
+html[data-skin="blg"] .championship-lobby .stage-beam.beam-left { --scene-glow: #f899ce75; }
+html[data-skin="blg"] .championship-lobby .stage-beam.beam-right { --scene-glow: #79e6fd75; }
+
+html[data-skin="blg"] .championship-lobby :is(.weekly-list, .lobby-game, .moment-tile, .lobby-floating-nav) {
+  border-color: var(--scene-line);
+  background-color: #17213a;
+}
+
+html[data-skin="blg"] .championship-lobby :is(.signature-card, .lobby-game, .moment-tile):hover {
+  border-color: var(--blg-pink);
+}
+
+html[data-skin="blg"] .championship-lobby .club-footer {
+  background: linear-gradient(110deg, #42233478, #18364b78);
+  padding-inline: clamp(12px, 2vw, 28px);
+}
+
+.championship-footer-link {
+  color: #addef3;
+  text-underline-offset: 3px;
+}
+
+html[data-skin="blg"] .atmosphere-toggle {
+  border-color: #fac8e7a0;
+  background: linear-gradient(106deg, #2d1b3d, #112e47);
+  color: #ffd7ee;
+}
+
+html[data-skin="blg"] .profile-global-header {
+  border-image: linear-gradient(90deg, #f1a3d36b, #a0e2ff55, transparent) 1;
 }
 
 .championship-feature {
   margin-block: clamp(12px, 2.1vw, 30px) clamp(32px, 4vw, 60px);
-  border: 1px solid #a1bbff40;
+  border: 1px solid #d6bd8361;
   border-radius: 18px;
   overflow: hidden;
   background: #070e20;
@@ -33,40 +114,48 @@ body:has(.championship-lobby) {
   isolation: isolate;
   container-type: inline-size;
   display: grid;
+  grid-template-columns: minmax(255px, .85fr) minmax(0, 2.5fr);
   align-items: center;
-  min-height: clamp(475px, 47vw, 640px);
   overflow: hidden;
+  background: linear-gradient(135deg, #291e3e, #101c32 35%, #0b1324);
 }
 
-.championship-picture,
-.championship-hero::after {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
+.championship-art {
+  min-width: 0;
+  margin: 0;
+  grid-column: 2;
+  grid-row: 1;
+  border-inline-start: 1px solid #d6bd8361;
 }
 
-.championship-picture {
-  z-index: -2;
+.championship-art picture {
+  display: block;
 }
 
-.championship-picture img {
+.championship-art img {
   display: block;
   width: 100%;
-  height: 100%;
-  object-fit: cover;
-  object-position: 63% 48%;
+  height: auto;
 }
 
-.championship-hero::after {
-  z-index: -1;
-  content: "";
-  background: linear-gradient(90deg, #070b1a 0%, #070b1af0 21%, #070b1a87 44%, #070b1a00 71%),
-              linear-gradient(0deg, #070e20b5, transparent 25%);
+.championship-art figcaption {
+  padding: 6px 12px;
+  border-top: 1px solid #d6bd8348;
+  color: #c4d3e2;
+  background: #10182a;
+  font-size: 11px;
+  text-align: end;
+}
+
+.championship-art a:hover {
+  text-decoration: underline;
 }
 
 .championship-copy {
-  width: min(51%, 650px);
-  padding: clamp(30px, 4.4vw, 68px);
+  grid-column: 1;
+  grid-row: 1;
+  min-width: 0;
+  padding: clamp(22px, 3vw, 42px);
 }
 
 .championship-kicker,
@@ -89,28 +178,6 @@ body:has(.championship-lobby) {
   content: "";
 }
 
-.championship-copy h1 {
-  margin: 14px 0 22px;
-  color: #f8f7ff;
-  font-size: clamp(32px, 4.35vw, 72px);
-  line-height: 1.12;
-  letter-spacing: -.055em;
-  font-weight: 950;
-  text-wrap: nowrap;
-}
-
-.championship-copy h1 > span {
-  display: block;
-  width: fit-content;
-  margin: 0 0 6px -.055em;
-  padding-inline-end: .12em;
-  background: linear-gradient(105deg, #ccf7ff 5%, #f8f7ff 50%, #ff9bd2 100%);
-  color: transparent;
-  background-clip: text;
-  font: 950 clamp(108px, 13vw, 198px)/.78 "Arial Black", system-ui, sans-serif;
-  letter-spacing: -.095em;
-}
-
 .championship-result,
 .championship-series,
 .championship-actions {
@@ -121,7 +188,9 @@ body:has(.championship-lobby) {
 
 .championship-result {
   width: fit-content;
-  gap: 14px;
+  margin: 13px 0 0;
+  flex-wrap: nowrap;
+  gap: clamp(8px, 1.1vw, 15px);
   color: #cbd5eb;
   font-size: 13px;
   letter-spacing: .12em;
@@ -132,8 +201,8 @@ body:has(.championship-lobby) {
 }
 
 .championship-result strong {
-  color: #fff;
-  font: 830 36px/1 system-ui, sans-serif;
+  color: var(--blg-gold);
+  font: 850 clamp(42px, 4.2vw, 69px)/1 system-ui, sans-serif;
   font-variant-numeric: tabular-nums;
 }
 
@@ -200,10 +269,7 @@ body:has(.championship-lobby) {
 }
 
 .championship-celebrate {
-  position: absolute;
-  bottom: 16px;
-  right: 16px;
-  padding: 10px 13px;
+  padding: 8px 10px;
   border: 1px solid #bde8ff70;
   border-radius: 6px;
   color: #f8fbff;
@@ -325,30 +391,14 @@ body:has(.championship-lobby) {
   .championship-intel > .site-shell { padding-inline: 16px; }
   .championship-feature { border-radius: 12px; }
   .championship-hero {
-    min-height: 0;
     display: flex;
     flex-direction: column;
     align-items: stretch;
-    padding-top: clamp(184px, 60vw, 335px);
   }
-  .championship-picture {
-    bottom: auto;
-    height: clamp(240px, 79vw, 420px);
-  }
-  .championship-picture img { object-position: center 40%; }
-  .championship-hero::after {
-    bottom: auto;
-    height: clamp(240px, 79vw, 420px);
-    background: linear-gradient(0deg, #070e20 1%, #070e20a8 24%, transparent 58%);
-  }
-  .championship-copy {
-    width: 100%;
-    padding: 12px 18px 22px;
-  }
-  .championship-copy h1 { margin: 12px 0 15px; font-size: clamp(29px, 8.6vw, 52px); }
-  .championship-copy h1 > span { font-size: clamp(83px, 21vw, 132px); }
+  .championship-art { border-inline-start: 0; }
+  .championship-copy { padding: 14px 16px 17px; }
   .championship-series { margin-bottom: 16px; }
-  .championship-celebrate { top: 10px; right: 10px; bottom: auto; padding: 7px 9px; }
+  .championship-actions { gap: 6px 11px; }
   .championship-event {
     grid-template-columns: auto minmax(0, 1fr);
     gap: 4px 14px;
@@ -357,6 +407,7 @@ body:has(.championship-lobby) {
   .championship-multiplier { grid-row: span 2; }
   .championship-dates { display: flex; align-items: baseline; gap: 7px; padding: 0; border: 0; }
   .championship-dates span { margin-top: 0; }
+  .championship-event h2 { font-size: clamp(16px, 4.8vw, 19px); }
 }
 
 @media (prefers-reduced-motion: reduce) {
