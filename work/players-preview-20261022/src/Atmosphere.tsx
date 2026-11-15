@@ -2,7 +2,19 @@ import {useEffect,useRef,useState} from 'react';
 // 组件内有同名状态 track（曲目 id），打点函数改名为 trackEvent 避免遮蔽
 import {track as trackEvent} from '../lib/analytics';
 
-const skins=[['hextech','海克斯鎏金','#d8b778'],['freljord','极地极光','#7de1e0'],['void','虚空星云','#c3a4ff'],['zaun','祖安霓虹','#a4ed7d']] as const;
+const skins=[['blg','BLG 冠军主题','#f8badf'],['hextech','海克斯鎏金','#d8b778'],['freljord','极地极光','#7de1e0'],['void','虚空星云','#c3a4ff'],['zaun','祖安霓虹','#a4ed7d']] as const;
+const skinPreference = 'battlebook-skin-v2';
+
+function initialSkin() {
+  try {
+    const saved = localStorage.getItem(skinPreference);
+    const legacy = localStorage.getItem('battlebook-skin');
+    const preferred = saved ?? (legacy === 'hextech' ? null : legacy);
+    return skins.find(([id]) => id === preferred)?.[0] ?? 'blg';
+  } catch {
+    return 'blg';
+  }
+}
 const tracks=[['sessions-vi','Sessions: Vi · 松弛 Lo-fi','https://soundcloud.com/leagueoflegends/sets/sessions-vi'],['sessions-diana','Sessions: Diana · 月下氛围','https://soundcloud.com/leagueoflegends/sets/sessions-diana']] as const;
 type Widget={bind:(event:string,fn:()=>void)=>void;setVolume:(n:number)=>void;play:()=>void;pause:()=>void;getCurrentSound:(fn:(s:{title?:string;user?:{username?:string}})=>void)=>void};
 type SoundCloud={Widget:((frame:HTMLIFrameElement)=>Widget)&{Events:{READY:string;PLAY:string;PAUSE:string;ERROR:string;FINISH:string}}};
@@ -15,12 +27,12 @@ function soundCloud(){
  }).catch(e=>{sdk=undefined;throw e;});return sdk;
 }
 export default function Atmosphere(){
- const[open,setOpen]=useState(false),[skin,setSkin]=useState(()=>{try{const s=localStorage.getItem('battlebook-skin');return skins.some(([id])=>id===s)?s!:'hextech';}catch{return 'hextech';}});
+ const[open,setOpen]=useState(false),[skin,setSkin]=useState(initialSkin);
  const[volume,setVolume]=useState(()=>{try{const v=Number(localStorage.getItem('battlebook-volume')??18);return Number.isFinite(v)?Math.min(35,Math.max(0,v)):18;}catch{return 18;}});
  const[enabled,setEnabled]=useState(false),[track,setTrack]=useState('sessions-vi'),[attempt,setAttempt]=useState(0),[playing,setPlaying]=useState(false),[status,setStatus]=useState('默认静音，点一下才开始。'),[credit,setCredit]=useState('');
  const albumUrl=(tracks.find(([id])=>id===track)??tracks[0])[2];
  const frame=useRef<HTMLIFrameElement>(null),widget=useRef<Widget|null>(null),volumeRef=useRef(volume);volumeRef.current=volume;
- useEffect(()=>{document.documentElement.dataset.skin=skin;try{localStorage.setItem('battlebook-skin',skin);}catch{}},[skin]);
+ useEffect(()=>{document.documentElement.dataset.skin=skin;try{localStorage.setItem(skinPreference,skin);}catch{}},[skin]);
  useEffect(()=>{widget.current?.setVolume(volume);try{localStorage.setItem('battlebook-volume',String(volume));}catch{}},[volume]);
  useEffect(()=>{if(!enabled)return;let alive=true;setStatus('正在连接 Riot Sessions…');setPlaying(false);setCredit('');
   const timer=setTimeout(()=>{if(alive)setStatus('音乐服务连接较慢，可重试或打开官方专辑。');},18000);
