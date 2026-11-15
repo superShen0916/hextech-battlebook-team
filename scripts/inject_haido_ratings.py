@@ -74,6 +74,7 @@ def inject_match_deltas(view: dict, row: dict) -> int:
     """
     deltas = row.get("match_deltas") or {}
     weights = row.get("match_weights") or {}
+    championship = row.get('match_championship_multipliers') or {}
     pentas = row.get("match_penta_bonuses") or {}
     volumes = row.get('match_volume_multipliers') or {}
     indices = row.get('match_week_indices') or {}
@@ -83,6 +84,10 @@ def inject_match_deltas(view: dict, row: dict) -> int:
         if isinstance(delta, (int, float)):
             match['rating_delta'] = delta
             match['rating_mult'] = weights.get(match.get('id'), 1.0)
+            if match['id'] in championship:
+                match['rating_championship_mult'] = championship[match['id']]
+            else:
+                match.pop('rating_championship_mult', None)
             if match['id'] in volumes:
                 match['rating_volume_mult'] = volumes[match['id']]
                 match['rating_week_index'] = indices[match['id']]
@@ -97,6 +102,7 @@ def inject_match_deltas(view: dict, row: dict) -> int:
         else:
             match.pop('rating_delta', None)
             match.pop('rating_mult', None)
+            match.pop('rating_championship_mult', None)
             match.pop('rating_penta_bonus', None)
             match.pop('rating_volume_mult', None)
             match.pop('rating_week_index', None)

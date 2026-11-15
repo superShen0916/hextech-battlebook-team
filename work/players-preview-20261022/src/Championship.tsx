@@ -94,8 +94,9 @@ export function ChampionshipHero({ children }: { children: ReactNode }) {
       <section className="championship-event" id="championship-week" aria-labelledby="championship-event-title">
         <div className="championship-multiplier" aria-hidden="true">×2</div>
         <div className="championship-event-copy">
-          <p>BLG 夺冠周预告</p>
+          <p>BLG 夺冠周活动</p>
           <h2 id="championship-event-title">{activityTitle}</h2>
+          <p>按开局时间结算，涨分和扣分都 ×2，可叠加战斗之夜。</p>
         </div>
         <p className="championship-dates"><strong>{activityDates}</strong><span>2026 · 北京时间</span></p>
       </section>

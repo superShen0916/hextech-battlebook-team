@@ -44,7 +44,7 @@ class RatingV4Tests(unittest.TestCase):
         self.assertEqual(rating.week_scores(rows, 0, 1)[0]['n'], 1)
 
     def test_loss_ratio_zero_point_matches_declared_ratio(self):
-        # 5.1：胜负项未加权零点48.7%。取12局内样本，避免顺序递减干扰零点。
+        # 历史周默认5.1：胜负项未加权零点48.7%。取12局内样本，避免顺序递减干扰零点。
         self.assertAlmostEqual(rating.WEEK_EDGE_LOSS / (1 + rating.WEEK_EDGE_LOSS), .4872, places=4)
         with patch.object(rating, 'WEEK_VOLUME_FULL_GAMES', 100):
             even = rating.week_terms(self.rows(39, 19, z=1), 0, 1)
@@ -224,9 +224,10 @@ class RatingV4Tests(unittest.TestCase):
                 self.assertNotEqual(before, data_inputs(root, rating.CUTOFF))
 
     def valid_rating(self):
-        conf = 2 / (2 + rating.WEEK_CONF_K)
-        win_part = rating.WEEK_W * (1 - rating.WEEK_EDGE_LOSS) * conf
-        perf = rating.WEEK_Z_POS * (.5 * 2) * conf
+        rule = rating.CURRENT_RULES  # 发布门禁按当前生效周规则校验分项
+        conf = 2 / (2 + rule.conf_k)
+        win_part = rule.w * (1 - rule.edge_loss) * conf
+        perf = rule.z_pos * (.5 * 2) * conf
         delta = round(win_part + perf, 1)
         return rating_for({'tier': 'stable', 'haido': 1000 + delta, 'n': 100, 'base': 1000,
                            'lp_prev': 1000, 'week_games': 2, 'week_wins': 1, 'week_win_rate': .5,
@@ -235,12 +236,12 @@ class RatingV4Tests(unittest.TestCase):
                            'settled_delta': 0, 'settled_weeks': [],
                            'calculation': {'confidence': conf, 'avg_z': .5, 'performance_sum_z': 1,
                                            'performance_sum_pos': 1, 'performance_sum_neg': 0,
-                                           'performance_sum_effective': rating.WEEK_Z_POS,
+                                           'performance_sum_effective': rule.z_pos,
                                            'win_part': win_part, 'penta_games': 0, 'penta_count': 0, 'penta_part': 0,
                                            'weighted_wins': 1, 'weighted_losses': 1, 'volume_average': 1,
                                            'performance_part': perf, 'raw_delta': win_part + perf,
-                                           'cap': rating.WEEK_CAP,
-                                           'effective_edge': 1 - rating.WEEK_EDGE_LOSS,
+                                           'cap': rule.cap,
+                                           'effective_edge': 1 - rule.edge_loss,
                                            'battle_night_games': 0, 'battle_night_wins': 0,
                                            'battle_night_mult': rating.BATTLE_NIGHT_MULT}},
                           rating.VERSION)
@@ -420,6 +421,48 @@ class RatingV4Tests(unittest.TestCase):
             with self.subTest(value=value), self.assertRaises(AssertionError):
                 verify_rating(broken, rating.WEEK0, 'forged')
 
+    def test_championship_window_uses_beijing_match_start(self):
+        cases = (
+            ('2026-11-15T23:59:59.999+08:00', 1),
+            ('2026-11-16T00:00:00+08:00', 2),
+            ('2026-11-22T23:59:59.999+08:00', 2),
+            ('2026-11-23T00:00:00+08:00', 1),
+        )
+        for time, multiplier in cases:
+            with self.subTest(time=time):
+                self.assertEqual(rating.championship_weight(ms(time)), multiplier)
+
+    def test_championship_doubles_signed_contributions_and_stacks_with_battle_night(self):
+        start = ms('2026-11-16T00:00:00+08:00')
+        before = ms('2026-11-09T00:00:00+08:00')
+        after = ms('2026-11-23T00:00:00+08:00')
+        week = start - before
+        rows = [(start, 60, True, 1), (start+86_400_000, 40, False, 0),
+                (ms('2026-11-20T20:00:00+08:00'), 50, True, 2)]
+        control = [(ts-week, perf, win, pk) for ts, perf, win, pk in rows]
+        upcoming = [(ts+week, perf, win, pk) for ts, perf, win, pk in rows]
+        base_week, event_week, next_week = rating.week_scores(control+rows+upcoming, 50, 10).values()
+        for field in ('win_part_raw', 'perf_part_raw', 'penta_part', 'raw_score'):
+            self.assertAlmostEqual(event_week[field], 2*base_week[field], places=5)
+            self.assertEqual(next_week[field], base_week[field])
+        self.assertEqual(event_week['battle_night_games'], 1)
+        self.assertEqual(event_week['penta_part'], 16)  # 普通五杀 +4、战斗之夜两次 +12
+        ids = ['win', 'loss', 'night']
+        parts = rating.match_contributions(rows, ids, 50, 10)
+        self.assertLess(parts['loss'], 0)
+        self.assertAlmostEqual(sum(parts.values()), event_week['score'])
+        for mid, normal in rating.match_contributions(control, ids, 50, 10).items():
+            self.assertLess(abs(parts[mid]-2*normal), 0.21)
+        live = rating.period_score(rows, 1000, 50, 10, after-1)
+        settled = rating.period_score(rows, 1000, 50, 10, after)
+        self.assertEqual(live['week_delta'], event_week['score'])
+        self.assertEqual(settled['week_delta'], 0)
+        self.assertEqual(settled['settled_delta'], event_week['score'])
+        self.assertEqual(settled['score'], live['score'])
+        partial = rating.period_score(rows[:1], 1000, 50, 10, after)
+        self.assertNotEqual(partial['settled_delta'], settled['settled_delta'])
+        self.assertEqual(rating.period_score(rows[::-1], 1000, 50, 10, after), settled)
+
     def test_battle_night_window_is_friday_2000_to_saturday_0200(self):
         night = ms('2026-10-23T20:00:00+08:00')
         self.assertEqual(rating.battle_night_weight(night), rating.BATTLE_NIGHT_MULT)
@@ -491,6 +534,74 @@ class RatingV4Tests(unittest.TestCase):
             if change == 'idle': row['week'].update(games=0, wins=0, win_rate=None)
             with self.subTest(change=change), self.assertRaises(AssertionError):
                 verify_rating(row, rating.WEEK0, 'a')
+
+
+class RatingRuleVersionTests(unittest.TestCase):
+    """5.2 按自然周分段：历史周固定5.1，生效周起用当前规则。"""
+
+    def test_effective_boundary_is_2026_11_09_beijing(self):
+        self.assertEqual(rating.RULE_52_START_MS, rating.WEEK0 + 3 * rating.WEEK_MS)
+        self.assertEqual(datetime.datetime.fromtimestamp(
+            rating.RULE_52_START_MS / 1000, rating.BEIJING).date().isoformat(), '2026-11-09')
+        self.assertEqual(rating.rules_for(rating.RULE_52_START_MS - 1).version, '5.1')
+        self.assertEqual(rating.rules_for(rating.RULE_52_START_MS).version, '5.2')
+
+    def test_history_week_uses_legacy_and_effective_week_uses_52(self):
+        legacy = [(rating.CUTOFF + i, 60.0, i < 6, 0) for i in range(12)]
+        current = [(rating.RULE_52_START_MS + i, 60.0, i < 6, 0) for i in range(12)]
+        weeks = rating.week_scores(legacy + current, 50, 10)
+        self.assertEqual(weeks[0]['score'], rating.week_terms(legacy, 50, 10)['score'])
+        self.assertEqual(weeks[3]['score'], rating.week_terms(current, 50, 10, rating.CURRENT_RULES)['score'])
+        self.assertGreater(weeks[3]['score'], weeks[0]['score'])
+
+    def test_current_rule_change_never_rewrites_history(self):
+        rows = [(rating.CUTOFF + i, 60.0, i < 6, 0) for i in range(12)]
+        before = rating.week_scores(rows, 50, 10)[0]['score']
+        alternate = rating.WeekRules(version='test', w=99.0, edge_loss=.1, z_pos=9.0, z_neg=9.0,
+                                     z_limit=2.0, conf_k=3.0, volume_full=12, volume_power=.5,
+                                     volume_floor=None, penta_bonus=2.0, cap=None)
+        with patch.object(rating, 'CURRENT_RULES', alternate):
+            during = rating.week_scores(rows, 50, 10)[0]['score']
+        self.assertEqual(before, during)
+
+    def test_rule_52_params_and_volume_floor(self):
+        r = rating.CURRENT_RULES
+        self.assertEqual((r.version, r.w, r.edge_loss, r.z_pos, r.z_neg, r.volume_floor),
+                         ('5.2', 6.30, .88, 1.10, .62, .65))
+        self.assertAlmostEqual(rating.volume_multiplier(110, r), .65)
+        self.assertGreater(rating.volume_multiplier(110, r), rating.volume_multiplier(110))
+        self.assertAlmostEqual(rating.volume_multiplier(12, r), 1.0)
+
+    def test_public_rules_describe_current_version_only(self):
+        rules = rating.public_rules()
+        self.assertEqual(rules['version'], rating.VERSION)
+        self.assertEqual(rules['legacy_version'], '5.1')
+        self.assertEqual(rules['rule_effective_from_ms'], rating.RULE_52_START_MS)
+        self.assertEqual(rules['week']['win_weight'], 6.30)
+        self.assertEqual(rules['week']['loss_ratio'], .88)
+        self.assertEqual(rules['week']['volume_floor'], .65)
+
+    def test_match_contributions_split_by_effective_week(self):
+        rows = ([(rating.CUTOFF + i, 60.0, i < 6, 0) for i in range(12)] +
+                [(rating.RULE_52_START_MS + i, 60.0, i < 6, 0) for i in range(12)])
+        ids = ['old-%d' % i for i in range(12)] + ['new-%d' % i for i in range(12)]
+        parts = rating.match_contributions(rows, ids, 50, 10)
+        weeks = rating.week_scores(rows, 50, 10)
+        for idx, t in weeks.items():
+            keys = [mid for mid, row in zip(ids, rows)
+                    if (row[0] - rating.WEEK0) // rating.WEEK_MS == idx]
+            self.assertAlmostEqual(sum(parts[k] for k in keys), t['score'], delta=.15)
+        self.assertGreater(sum(parts[k] for k in ids[12:]), sum(parts[k] for k in ids[:12]))
+
+    def test_period_score_settles_each_week_with_its_own_rules(self):
+        rows = ([(rating.CUTOFF + i, 60.0, i < 6, 0) for i in range(12)] +
+                [(rating.RULE_52_START_MS + i, 60.0, i < 6, 0) for i in range(12)])
+        as_of = rating.RULE_52_START_MS + rating.WEEK_MS + 1
+        period = rating.period_score(rows, 1000, 50, 10, as_of)
+        weeks = rating.week_scores(rows, 50, 10)
+        self.assertEqual([w['delta'] for w in period['settled_weeks']],
+                         [weeks[0]['score'], weeks[3]['score']])
+        self.assertEqual(period['week_delta'], 0)
 
 
 if __name__ == '__main__':
