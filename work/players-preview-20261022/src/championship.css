@@ -1,0 +1,365 @@
+.championship-lobby {
+  --blg-ice: #9aebff;
+  --blg-pink: #ff96ce;
+}
+
+body:has(.championship-lobby) {
+  background: radial-gradient(ellipse at 90% 14%, #12283d 0, transparent 44rem),
+              radial-gradient(ellipse at 4% 38%, #29152f 0, transparent 48rem), #080d19;
+}
+
+.championship-lobby .club-header,
+.championship-lobby .club-footer {
+  border-color: #8db5fa32;
+}
+
+.championship-lobby .club-brand .club-logo,
+.championship-lobby .club-header nav .current,
+.championship-lobby .lobby-section-head .section-kicker {
+  color: var(--blg-ice);
+}
+
+.championship-feature {
+  margin-block: clamp(12px, 2.1vw, 30px) clamp(32px, 4vw, 60px);
+  border: 1px solid #a1bbff40;
+  border-radius: 18px;
+  overflow: hidden;
+  background: #070e20;
+  box-shadow: 0 16px 56px #030610a6, 0 0 56px #d949b018;
+}
+
+.championship-hero {
+  position: relative;
+  isolation: isolate;
+  container-type: inline-size;
+  display: grid;
+  align-items: center;
+  min-height: clamp(475px, 47vw, 640px);
+  overflow: hidden;
+}
+
+.championship-picture,
+.championship-hero::after {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.championship-picture {
+  z-index: -2;
+}
+
+.championship-picture img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 63% 48%;
+}
+
+.championship-hero::after {
+  z-index: -1;
+  content: "";
+  background: linear-gradient(90deg, #070b1a 0%, #070b1af0 21%, #070b1a87 44%, #070b1a00 71%),
+              linear-gradient(0deg, #070e20b5, transparent 25%);
+}
+
+.championship-copy {
+  width: min(51%, 650px);
+  padding: clamp(30px, 4.4vw, 68px);
+}
+
+.championship-kicker,
+.championship-event-copy p {
+  color: var(--blg-ice);
+  font-size: 12px;
+  font-weight: 750;
+  letter-spacing: .15em;
+  margin: 0;
+}
+
+.championship-kicker::before {
+  display: inline-block;
+  width: 16px;
+  height: 2px;
+  margin-inline-end: 10px;
+  vertical-align: .26em;
+  background: var(--blg-pink);
+  box-shadow: 0 0 10px var(--blg-pink);
+  content: "";
+}
+
+.championship-copy h1 {
+  margin: 14px 0 22px;
+  color: #f8f7ff;
+  font-size: clamp(32px, 4.35vw, 72px);
+  line-height: 1.12;
+  letter-spacing: -.055em;
+  font-weight: 950;
+  text-wrap: nowrap;
+}
+
+.championship-copy h1 > span {
+  display: block;
+  width: fit-content;
+  margin: 0 0 6px -.055em;
+  padding-inline-end: .12em;
+  background: linear-gradient(105deg, #ccf7ff 5%, #f8f7ff 50%, #ff9bd2 100%);
+  color: transparent;
+  background-clip: text;
+  font: 950 clamp(108px, 13vw, 198px)/.78 "Arial Black", system-ui, sans-serif;
+  letter-spacing: -.095em;
+}
+
+.championship-result,
+.championship-series,
+.championship-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.championship-result {
+  width: fit-content;
+  gap: 14px;
+  color: #cbd5eb;
+  font-size: 13px;
+  letter-spacing: .12em;
+}
+
+.championship-result b:first-child {
+  color: var(--blg-pink);
+}
+
+.championship-result strong {
+  color: #fff;
+  font: 830 36px/1 system-ui, sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+
+.championship-result strong span {
+  color: #8491ac;
+  padding-inline: 5px;
+}
+
+.championship-series {
+  list-style: none;
+  padding: 0;
+  margin: 11px 0 26px;
+  gap: 5px;
+}
+
+.championship-series li {
+  padding: 3px 7px;
+  border: 1px solid #d3deff30;
+  border-radius: 4px;
+  color: #d7dff3;
+  background: #131c2b;
+  font: 750 10px/1.7 system-ui, sans-serif;
+  white-space: nowrap;
+}
+
+.championship-series li[data-winner="BLG"] {
+  color: #ffd4eb;
+  background: #552449;
+  border-color: #ff91d45c;
+}
+
+.championship-series span {
+  margin-inline-end: 2px;
+  opacity: .85;
+}
+
+.championship-actions {
+  gap: 8px 16px;
+}
+
+.championship-actions > a,
+.championship-actions > button,
+.championship-celebrate {
+  font: 700 13px/1.45 system-ui, sans-serif;
+}
+
+.championship-actions > a:not(.button) {
+  padding-block: 9px;
+  color: #d3edff;
+}
+
+.championship-actions > a:hover {
+  text-decoration: underline;
+}
+
+.championship-actions .championship-primary {
+  margin: 0;
+  padding: 11px 16px;
+  border: 1px solid #f9d2f7;
+  border-radius: 7px;
+  color: #131326;
+  background: linear-gradient(112deg, #ffc8e7, #b1ecff);
+  box-shadow: 0 0 26px #fe87ca38;
+}
+
+.championship-celebrate {
+  position: absolute;
+  bottom: 16px;
+  right: 16px;
+  padding: 10px 13px;
+  border: 1px solid #bde8ff70;
+  border-radius: 6px;
+  color: #f8fbff;
+  background: #0b1830e8;
+  cursor: pointer;
+}
+
+.championship-celebrate:hover {
+  border-color: var(--blg-pink);
+}
+
+.championship-celebrate span {
+  color: var(--blg-pink);
+}
+
+.championship-event {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: clamp(12px, 2vw, 28px);
+  align-items: center;
+  padding: 15px clamp(18px, 4vw, 60px);
+  border-top: 1px solid #ffa6d17d;
+  background: linear-gradient(112deg, #332044, #17263c 66%, #152e42);
+  scroll-margin-top: 18px;
+}
+
+.championship-multiplier {
+  color: #ffd3ef;
+  text-shadow: 0 0 24px #f868b760;
+  font: italic 950 clamp(40px, 6vw, 82px)/1 system-ui, sans-serif;
+  letter-spacing: -.08em;
+}
+
+.championship-event h2 {
+  margin: 2px 0 0;
+  color: #f7f4ff;
+  font-size: clamp(19px, 2.55vw, 38px);
+  line-height: 1.2;
+  letter-spacing: -.025em;
+}
+
+.championship-dates {
+  margin: 0;
+  padding-inline-start: clamp(10px, 3vw, 40px);
+  border-inline-start: 1px solid #9ebde952;
+  color: #d3f5ff;
+  line-height: 1.35;
+}
+
+.championship-dates strong,
+.championship-dates span {
+  display: block;
+}
+
+.championship-dates strong {
+  font-size: clamp(14px, 2vw, 25px);
+  white-space: nowrap;
+}
+
+.championship-dates span {
+  margin-top: 4px;
+  font-size: 11px;
+}
+
+.championship-ribbon {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 2px 12px;
+  margin-block: 12px;
+  padding: 7px 13px;
+  border: 1px solid #a477ab43;
+  border-radius: 7px;
+  background: linear-gradient(100deg, #2b1a32, #102132);
+  color: #d6e7f4;
+  font-size: 12px;
+}
+
+.championship-ribbon strong {
+  color: #ffd2ea;
+}
+
+.championship-ribbon strong span {
+  margin-inline-end: 3px;
+}
+
+.championship-intel > .site-shell {
+  max-width: 1240px;
+}
+
+.championship-confetti {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.championship-confetti i {
+  position: absolute;
+  left: 50%;
+  bottom: 13%;
+  width: 9px;
+  height: 5px;
+  background: #fcb0df;
+  opacity: 0;
+  animation: championship-confetti 1.45s cubic-bezier(.18, .54, .4, 1) var(--delay);
+}
+
+.championship-confetti i:nth-child(3n) { background: #92eaff; }
+.championship-confetti i:nth-child(3n + 1) { background: #f8f8ff; }
+
+@keyframes championship-confetti {
+  6% { opacity: 1; }
+  57% { opacity: 1; transform: translate(var(--x), var(--y)) rotate(var(--spin)); }
+  100% { opacity: 0; transform: translate(var(--x), 24px) rotate(calc(var(--spin) + 170deg)); }
+}
+
+@media (max-width: 740px) {
+  .championship-intel > .site-shell { padding-inline: 16px; }
+  .championship-feature { border-radius: 12px; }
+  .championship-hero {
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    padding-top: clamp(184px, 60vw, 335px);
+  }
+  .championship-picture {
+    bottom: auto;
+    height: clamp(240px, 79vw, 420px);
+  }
+  .championship-picture img { object-position: center 40%; }
+  .championship-hero::after {
+    bottom: auto;
+    height: clamp(240px, 79vw, 420px);
+    background: linear-gradient(0deg, #070e20 1%, #070e20a8 24%, transparent 58%);
+  }
+  .championship-copy {
+    width: 100%;
+    padding: 12px 18px 22px;
+  }
+  .championship-copy h1 { margin: 12px 0 15px; font-size: clamp(29px, 8.6vw, 52px); }
+  .championship-copy h1 > span { font-size: clamp(83px, 21vw, 132px); }
+  .championship-series { margin-bottom: 16px; }
+  .championship-celebrate { top: 10px; right: 10px; bottom: auto; padding: 7px 9px; }
+  .championship-event {
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 4px 14px;
+    padding: 12px 14px 15px;
+  }
+  .championship-multiplier { grid-row: span 2; }
+  .championship-dates { display: flex; align-items: baseline; gap: 7px; padding: 0; border: 0; }
+  .championship-dates span { margin-top: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .championship-celebrate,
+  .championship-confetti { display: none; }
+}
