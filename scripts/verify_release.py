@@ -11,16 +11,16 @@ from app.awards import VERSION as PERFORMANCE_VERSION
 from haido.rating_lp import (VERSION, WEEK_MS, week_start_ms, public_rules, CUTOFF,
                              WEEK_W, WEEK_Z_POS, WEEK_Z_NEG, WEEK_CAP, WEEK_CONF_K, WEEK_EDGE_LOSS,
                              WEEK_Z_LIMIT, WEEK_PENTA_BONUS, BATTLE_NIGHT_MULT, battle_night_weight,
-                             match_contributions, volume_multiplier, week_terms, load_weekly_calibration)
+                             championship_weight, match_contributions, volume_multiplier, week_terms,
+                             load_weekly_calibration, CURRENT_RULES)
 
-# 4.5 起 WEEK_CAP 为 None（不封顶）；有上限时才校验截断边界。
-CAP_LIMIT = math.inf if WEEK_CAP is None else WEEK_CAP
+# 当前生效周及以后用5.2参数；历史周由评分入口按周固定为5.1，不随规则升级改变。
+R = CURRENT_RULES
+# 4.5 起不封顶；有上限时才校验截断边界。
+CAP_LIMIT = math.inf if R.cap is None else R.cap
 # 产物只存 6 位小数（单场 performance.score、周内 performance_sum_pos/neg），
 # 用这些值反推全精度分项必然有 1e-7 级残差，所以校验按截断精度设容差。
 SPLIT_TOLERANCE = 1e-5
-# 单局理论边界（conf≤1）：胜负 + 正向表现 + 五杀，允许十分位分摊舍入差。
-MATCH_LIMIT = (WEEK_W + WEEK_Z_POS * WEEK_Z_LIMIT + WEEK_PENTA_BONUS) * BATTLE_NIGHT_MULT
-
 
 def verify_rating(rating, period, label):
     assert isinstance(rating, dict) and rating.get('source') == 'haido-self', 'missing_self_rating:' + label
@@ -42,27 +42,28 @@ def verify_rating(rating, period, label):
     assert abs(math.fsum(w['delta'] for w in history)-settled) < 0.01, 'settlement_sum_mismatch:' + label
     assert abs(week.get('prev_score')-base-settled) <= 0.101 and abs(score-base-settled-delta) <= 0.101, 'rating_total_mismatch:' + label
     calc = rating.get('calculation') or {}
-    conf = games/(games+WEEK_CONF_K)
-    assert calc.get('cap') == WEEK_CAP and abs(calc.get('confidence', -1)-conf) < 1e-9, 'invalid_score_explanation:' + label
+    conf = games/(games+R.conf_k)
+    assert calc.get('cap') == R.cap and abs(calc.get('confidence', -1)-conf) < 1e-9, 'invalid_score_explanation:' + label
     # 战斗之夜：窗口内对局权重 ×1.5，胜负项与表现项同步放大
     bn_games, bn_wins = calc.get('battle_night_games'), calc.get('battle_night_wins')
     assert type(bn_games) is int and type(bn_wins) is int and 0 <= bn_wins <= bn_games <= games, 'invalid_battle_night_sample:' + label
     assert calc.get('battle_night_mult') == BATTLE_NIGHT_MULT, 'wrong_battle_night_multiplier:' + label
     boost = BATTLE_NIGHT_MULT - 1
+    activity = championship_weight(period)
     weighted_wins, weighted_losses = calc.get('weighted_wins'), calc.get('weighted_losses')
-    floor = volume_multiplier(games) if games else 0
-    for value, maximum in ((weighted_wins, wins+boost*bn_wins),
-                           (weighted_losses, games-wins+boost*(bn_games-bn_wins))):
+    floor = volume_multiplier(games, R) if games else 0
+    for value, maximum in ((weighted_wins, activity*(wins+boost*bn_wins)),
+                           (weighted_losses, activity*(games-wins+boost*(bn_games-bn_wins)))):
         assert type(value) in (int, float) and math.isfinite(value) and floor*maximum-1e-8 <= value <= maximum+1e-8, 'invalid_volume_weight:' + label
-    average = math.fsum(volume_multiplier(i+1) for i in range(games))/games if games else 0
+    average = math.fsum(volume_multiplier(i+1, R) for i in range(games))/games if games else 0
     assert abs(calc.get('volume_average', math.inf)-average) < 1e-9, 'wrong_volume_average:' + label
-    edge = weighted_wins - WEEK_EDGE_LOSS*weighted_losses
+    edge = weighted_wins - R.edge_loss*weighted_losses
     assert abs(calc.get('effective_edge', math.inf)-edge) < 1e-8, 'wrong_effective_edge:' + label
-    win_part = WEEK_W*edge*conf
+    win_part = R.w*edge*conf
     assert abs(calc.get('win_part', math.inf)-win_part) < 1e-8, 'wrong_win_component:' + label
     signal = calc.get('performance_sum_z')
     assert type(signal) in (int, float) and math.isfinite(signal), 'missing_performance_sum:' + label
-    limit = WEEK_Z_LIMIT*(weighted_wins+weighted_losses)
+    limit = R.z_limit*(weighted_wins+weighted_losses)
     assert abs(signal) <= limit+SPLIT_TOLERANCE, 'invalid_performance_sum:' + label
     # 5.0 起表现项正负分离：正向端按 WEEK_Z_POS 加，负向端只含输局、按 WEEK_Z_NEG 缩扣
     pos, neg = calc.get('performance_sum_pos'), calc.get('performance_sum_neg')
@@ -71,7 +72,7 @@ def verify_rating(rating, period, label):
         assert 0 <= sign*value <= limit+SPLIT_TOLERANCE, 'invalid_performance_split:' + label
     # pos/neg 是 6 位小数，signal 是全精度，两边的差可以到 1e-7 量级。
     assert signal-SPLIT_TOLERANCE <= pos+neg <= limit+SPLIT_TOLERANCE, 'inconsistent_performance_split:' + label
-    perf = (WEEK_Z_POS*pos + WEEK_Z_NEG*neg)*conf
+    perf = (R.z_pos*pos + R.z_neg*neg)*conf
     # rating_lp 落盘时把 performance_sum_pos/neg 舍到 6 位小数，performance_part/
     # raw_delta 保留全精度。用舍入值重算的差最多 (Z_POS+Z_NEG)*5e-7*conf < 2e-6。
     assert abs(calc.get('performance_part', math.inf)-perf) < SPLIT_TOLERANCE, 'wrong_performance_component:' + label
@@ -79,10 +80,10 @@ def verify_rating(rating, period, label):
     assert type(pentas) is int and 0 <= pentas <= games, 'invalid_penta_games:' + label
     assert type(penta_count) is int and penta_count >= pentas and (pentas > 0 or penta_count == 0), 'invalid_penta_count:' + label
     assert type(penta) in (int, float) and math.isfinite(penta), 'invalid_penta_bonus:' + label
-    assert WEEK_PENTA_BONUS*penta_count <= penta <= WEEK_PENTA_BONUS*BATTLE_NIGHT_MULT*penta_count, 'invalid_penta_bonus:' + label
+    assert R.penta_bonus*activity*penta_count <= penta <= R.penta_bonus*BATTLE_NIGHT_MULT*activity*penta_count, 'invalid_penta_bonus:' + label
     assert abs(calc.get('raw_delta', math.inf)-win_part-perf-penta) < SPLIT_TOLERANCE, 'wrong_raw_delta:' + label
     raw = win_part+perf+penta
-    assert abs(delta-round(raw if WEEK_CAP is None else max(-WEEK_CAP,min(WEEK_CAP,raw)),1)) < 0.01, 'wrong_clamped_delta:' + label
+    assert abs(delta-round(raw if R.cap is None else max(-R.cap,min(R.cap,raw)),1)) < 0.01, 'wrong_clamped_delta:' + label
     assert (games > 0 or (wins == 0 and delta == 0)), 'idle_week_not_zero:' + label
     assert (week.get('win_rate') is None if not games else
             isinstance(week.get('win_rate'), (int, float)) and abs(week['win_rate'] - wins / games) <= 0.001), 'invalid_week_win_rate:' + label
@@ -145,6 +146,9 @@ def verify(api=API, full=FULL, write_manifest=False, expected_week_ms=None):
         rows, ids = [], []
         for match in shard['recent']:
             delta = match.get('rating_delta')
+            ts = match.get('started_ms') or 0
+            activity = championship_weight(ts)
+            assert match.get('rating_championship_mult') == (activity if delta is not None and activity > 1 else None), 'wrong_match_championship_weight:' + p['id']
             if (match.get('started_ms') or 0) < CUTOFF:
                 assert delta is None, 'match_delta_before_cutoff:' + p['id']
                 assert match.get('rating_penta_bonus') is None, 'penta_bonus_before_cutoff:' + p['id']
@@ -158,10 +162,11 @@ def verify(api=API, full=FULL, write_manifest=False, expected_week_ms=None):
             rows.append((match['started_ms'], perf['score'], bool(match['player']['win']), pk))
             ids.append(match['id'])
             assert type(pk) is int and pk >= 0, 'invalid_match_penta_count:' + p['id']
-            assert abs(delta) <= MATCH_LIMIT + WEEK_PENTA_BONUS*BATTLE_NIGHT_MULT*max(0, pk-1) + 0.051, 'invalid_match_delta:' + p['id']
-            expect_mult = BATTLE_NIGHT_MULT if battle_night_weight(match['started_ms']) > 1 else 1.0
+            expect_mult = battle_night_weight(ts)
             assert match.get('rating_mult') == expect_mult, 'wrong_match_weight:' + p['id']
-            bonus = WEEK_PENTA_BONUS*pk*expect_mult if pk > 0 else None
+            match_limit = (R.w + R.z_pos*R.z_limit + R.penta_bonus*pk) * expect_mult * activity
+            assert abs(delta) <= match_limit + 0.051, 'invalid_match_delta:' + p['id']
+            bonus = R.penta_bonus*pk*expect_mult*activity if pk > 0 else None
             assert match.get('rating_penta_bonus') == bonus, 'wrong_match_penta_bonus:' + p['id']
             start = week_start_ms(match['started_ms'])
             per_week[start] = per_week.get(start, 0.0) + delta
@@ -178,7 +183,7 @@ def verify(api=API, full=FULL, write_manifest=False, expected_week_ms=None):
                 assert match['rating_delta'] == expected_parts[match['id']], 'wrong_match_contribution:' + p['id']
                 assert match.get('rating_volume_mult') == volumes[match['id']], 'wrong_match_volume:' + p['id']
                 assert match.get('rating_week_index') == indices[match['id']], 'wrong_match_week_index:' + p['id']
-        current = week_terms([row for row in rows if period <= row[0] < period+WEEK_MS], cal['mean'], cal['sigma'])
+        current = week_terms([row for row in rows if period <= row[0] < period+WEEK_MS], cal['mean'], cal['sigma'], R)
         signal = current['performance_sum_z']
         assert abs(rating['calculation']['effective_edge']-current['edge']) < 1e-8, 'wrong_volume_edge_history:' + p['id']
         assert abs(rating['calculation']['weighted_wins']-current['weighted_wins']) < 1e-8, 'wrong_volume_wins_history:' + p['id']
@@ -192,7 +197,7 @@ def verify(api=API, full=FULL, write_manifest=False, expected_week_ms=None):
         penta_rows = [(ts, pk) for ts, _, _, pk in rows if period <= ts < period+WEEK_MS and pk > 0]
         assert rating['calculation']['penta_games'] == len(penta_rows), 'wrong_penta_history:' + p['id']
         assert rating['calculation']['penta_count'] == sum(pk for _, pk in penta_rows), 'wrong_penta_count:' + p['id']
-        assert rating['calculation']['penta_part'] == math.fsum(WEEK_PENTA_BONUS*pk*battle_night_weight(ts) for ts, pk in penta_rows), 'wrong_penta_history:' + p['id']
+        assert rating['calculation']['penta_part'] == math.fsum(R.penta_bonus*pk*battle_night_weight(ts)*championship_weight(ts) for ts, pk in penta_rows), 'wrong_penta_history:' + p['id']
         for key in ('puuid', 'account_key', 'match_key'):
             assert '"' + key + '"' not in json.dumps(shard), 'private_identity_exported'
         assert len(p['recent']) <= 20
