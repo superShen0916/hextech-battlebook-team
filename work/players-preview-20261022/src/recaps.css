@@ -4,31 +4,3 @@
 @media(max-width:360px){.club-header nav{gap:6px;flex-wrap:wrap;justify-content:flex-start}.club-header nav a{padding-right:5px}}
 
 .recap-share-actions{flex-wrap:wrap}.recap-share-backdrop{position:fixed;inset:0;background:#020913db;z-index:250;display:flex;justify-content:center;align-items:flex-start;overflow:auto;padding:24px}.recap-share-dialog{width:min(620px,100%);background:#142737;border:1px solid #647256;border-radius:16px;padding:22px;color:#e5edf4;box-shadow:0 24px 100px #0009;max-height:calc(100dvh - 48px);overflow:auto;outline:none}.recap-share-dialog header{display:flex;justify-content:space-between;gap:16px;align-items:start}.recap-share-dialog h3{color:#ecd098;margin:0;font-size:23px}.recap-share-dialog header p{font-size:12px;line-height:1.7;color:#aebfd0}.recap-share-dialog header button{flex-shrink:0}.recap-share-toolbar{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0}.recap-share-toolbar .ghost{min-height:44px;display:inline-flex;align-items:center;justify-content:center;text-decoration:none}.recap-share-link{display:flex;flex-direction:column;gap:6px;font-size:12px;color:#adc0ce}.recap-share-link input{width:100%;box-sizing:border-box;min-height:44px;font-size:13px;padding:8px;background:#0c1b28;color:#d7e4ee;border:1px solid #4c6377;border-radius:6px}.recap-share-dialog>img{display:block;width:100%;height:auto;border-radius:6px}.recap-share-dialog button:focus-visible,.recap-share-dialog a:focus-visible,.recap-share-link input:focus-visible{outline:2px solid #e5c37c;outline-offset:3px}@media(max-width:700px){.recap-share-backdrop{padding:10px}.recap-share-dialog{padding:14px;max-height:calc(100dvh - 20px)}.recap-share-dialog h3{font-size:19px}.recap-share-toolbar .ghost{flex:1;font-size:12px}.recap-share-link input{font-size:16px}.recap-actions .recap-share-actions{display:grid;grid-template-columns:1fr;align-items:stretch}}
-
-/* 本周最胡：高光回顾顶部的一张单局长图，只认已建档名册、只看本周。 */
-.roided-panel{margin:18px 0 4px;padding:16px 18px;border:1px solid #3b4a61;border-radius:14px;background:radial-gradient(ellipse at 12% 0,#e5c37c1f,transparent 62%),linear-gradient(135deg,#16273a,#0b1625)}
-.roided-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:10px}
-.roided-heading .section-kicker{margin:0;color:#e5c37c}
-.roided-badge{font-size:10px;letter-spacing:1px;color:var(--muted);border:1px solid #3b4a61;border-radius:999px;padding:3px 9px}
-.roided-card{display:flex;align-items:center;gap:16px;width:100%;min-width:0;text-align:left;border:0;background:transparent;padding:0;border-radius:10px;transition:transform .25s ease}
-.roided-card:hover{transform:translateY(-2px)}
-.roided-body{display:grid;gap:8px;flex:1;min-width:0}
-.roided-title{display:flex;align-items:center;gap:10px;flex-wrap:wrap;min-width:0}
-.roided-title h3{font-size:19px;margin:0;overflow-wrap:anywhere}
-.roided-hero{font-size:12px;color:var(--muted);padding-left:9px;border-left:1px solid #3b4a61}
-.roided-result{font-size:10px;letter-spacing:1px;padding:2px 8px;border-radius:999px;border:1px solid #3b4a61}
-.roided-result.won{color:#8cc7b0;border-color:#7ee4b966}
-.roided-result.lost{color:#d9959e;border-color:#ae6c7966}
-.roided-metrics{display:flex;gap:22px;flex-wrap:wrap;align-items:baseline;font-variant-numeric:tabular-nums}
-.roided-metrics strong{display:block;font-size:20px;font-weight:600;color:#e5c37c;letter-spacing:-.5px}
-.roided-metrics small{display:block;font-size:10px;color:var(--muted);margin-top:2px}
-.roided-share strong{font-size:30px;text-shadow:0 0 26px #b9904738}
-.roided-build{display:grid;gap:5px;flex-shrink:0}
-.roided-slot-row{display:flex;gap:4px;flex-wrap:wrap}
-.roided-slot{width:26px;height:26px;border-radius:6px;border:1px solid #3b4a61;background:#0b1625;display:grid;place-items:center;overflow:hidden}
-.roided-slot img{width:100%;height:100%;object-fit:cover;display:block}
-.roided-slot i{font-style:normal;font-size:11px;color:var(--muted)}
-.roided-augments{border-color:#e5c37c;opacity:.92}
-.roided-foot{font-size:10px;line-height:1.9;color:var(--muted);margin:12px 0 0}
-@media(max-width:700px){.roided-card{flex-wrap:wrap;gap:12px}.roided-body{flex:1 1 160px}.roided-build{width:100%;gap:6px}.roided-metrics{gap:16px}.roided-metrics strong{font-size:17px}.roided-share strong{font-size:26px}.roided-title h3{font-size:16px;overflow-wrap:anywhere}}
-@media(prefers-reduced-motion:reduce){.roided-card{transition:none}.roided-card:hover{transform:none}}

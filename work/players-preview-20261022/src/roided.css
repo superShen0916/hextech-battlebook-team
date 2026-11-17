@@ -1,0 +1,48 @@
+.roided-panel {
+  margin: 0 0 16px;
+  padding: 16px 18px;
+  border: 1px solid #776449;
+  border-radius: 14px;
+  color: #eef1f8;
+  background: radial-gradient(ellipse at 8% 0, #e5c37c1f, transparent 64%), #111e30;
+}
+.roided-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+.roided-heading h3 { margin: 0; color: #f1cf86; font-size: 24px; }
+.roided-heading time, .roided-foot { color: #aebbd0; font-size: 12px; }
+.roided-content { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; align-items: center; }
+.roided-player { display: flex; align-items: center; text-align: left; gap: 9px; border: 0; padding: 0; color: inherit; background: transparent; min-width: 0; max-width: 100%; }
+.roided-player:focus-visible { outline: 2px solid #f1cf86; outline-offset: 4px; }
+.roided-player-info { display: grid; gap: 3px; overflow-wrap: anywhere; }
+.roided-player-info strong { font-size: 17px; }
+.roided-player-info > span { color: #becae0; font-size: 12px; }
+.roided-player-info strong span { color: #f1cf86; }
+.roided-result { border: 1px solid #b97984; color: #efb0b9; border-radius: 999px; font-size: 11px; padding: 2px 7px; flex: none; }
+.roided-result[data-win="true"] { border-color: #65a990; color: #a2e9ce; }
+.roided-metrics { display: flex; align-items: end; gap: 8px 20px; flex-wrap: wrap; margin: 9px 0; font-variant-numeric: tabular-nums; }
+.roided-metrics > div { display: grid; gap: 1px; }
+.roided-metrics dt { grid-row: 2; color: #aebbd0; font-size: 11px; }
+.roided-metrics dd { margin: 0; font-size: 17px; font-weight: 650; color: #eef1f8; }
+.roided-metrics .roided-share dd { font-size: 29px; line-height: 1.05; color: #f1cf86; }
+.roided-gear, .roided-augments { list-style: none; padding: 0; margin: 0; }
+.roided-gear { display: flex; flex-wrap: wrap; gap: 4px; }
+.roided-gear li { display: grid; place-items: center; width: 24px; height: 24px; overflow: hidden; border: 1px solid #53657b; border-radius: 5px; }
+.roided-gear img, .roided-augments img { width: 100%; display: block; }
+.roided-build h4 { margin: 0 0 8px; color: #f1cf86; font-size: 14px; }
+.roided-augments { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.roided-augments li { display: grid; grid-template-columns: 28px minmax(0, 1fr); align-items: center; gap: 7px; padding: 5px 7px; min-height: 40px; background: #1c2b41; border: 1px solid #53657b; border-radius: 8px; font-size: 13px; font-weight: 650; overflow-wrap: anywhere; }
+.roided-augments li[data-rarity="gold"] { border-color: #937241; }
+.roided-augments li[data-rarity="prismatic"] { border-color: #a78ce1; background: linear-gradient(120deg, #343158, #1c2b41); }
+.roided-augment-icon { text-align: center; color: #f1cf86; }
+.roided-foot { margin: 9px 0 0; line-height: 1.55; }
+@media (max-width: 700px) {
+  .roided-panel { padding: 12px; }
+  .roided-heading { margin-bottom: 8px; }
+  .roided-heading h3 { font-size: 21px; }
+  .roided-content { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  .roided-player .profile-portrait { width: 40px; height: 40px; }
+  .roided-metrics { column-gap: 12px; }
+  .roided-metrics dd { font-size: 14px; }
+  .roided-metrics .roided-share dd { font-size: 24px; }
+  .roided-augments li { grid-template-columns: 24px minmax(0, 1fr); gap: 4px; padding: 4px; font-size: 12px; }
+  .roided-foot { font-size: 11px; }
+}
