@@ -81,6 +81,7 @@ export type VisitEvent =
   | 'recap_scope'
   | 'recap_share'
   | 'recap_copy'
+  | 'recap_open'
   // 并肩档案
   | 'pair_select'
   | 'pair_poster'

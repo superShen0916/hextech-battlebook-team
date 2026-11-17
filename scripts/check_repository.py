@@ -75,13 +75,23 @@ def inspect(root, names):
     return errors
 
 
+def tracked_names(root):
+    """git ls-files 的产出；解包出来、没有 .git 的 checkout 退回遍历目录，跳过本地数据与构建产物。"""
+    try:
+        raw = subprocess.check_output(['git', 'ls-files', '-z'], cwd=root, stderr=subprocess.DEVNULL)
+    except (OSError, subprocess.CalledProcessError):
+        skip = FORBIDDEN_PARTS | {'data', 'dist', 'node_modules'}
+        return sorted(path.relative_to(root).as_posix() for path in root.rglob('*')
+                      if path.is_file() and not skip.intersection(path.relative_to(root).parts))
+    return [name for name in raw.decode('utf-8').split('\0') if name]
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--root', type=Path, default=ROOT)
     args = parser.parse_args()
     root = args.root.resolve()
-    raw = subprocess.check_output(['git', 'ls-files', '-z'], cwd=root)
-    names = [name for name in raw.decode('utf-8').split('\0') if name]
+    names = tracked_names(root)
     errors = inspect(root, names)
     print(json.dumps({'ok': not errors, 'tracked_files': len(names), 'errors': errors}, ensure_ascii=False))
     return int(bool(errors))

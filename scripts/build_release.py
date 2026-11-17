@@ -97,7 +97,8 @@ def main():
                      '--out', ROOT / 'haido/haido_scores_lp.json'])
             command([sys.executable, ROOT / 'scripts/inject_haido_ratings.py', '--scores', ROOT / 'haido/haido_scores_lp.json', '--snapshot', build / 'snapshot.full.json'])
             command([sys.executable, ROOT / 'scripts/inject_ranked_bounds.py', '--snapshot', build / 'snapshot.full.json'])
-            command([sys.executable, ROOT / 'scripts/build_recaps.py', '--bundle', build / 'cache/details.bundle.json'])
+            command([sys.executable, ROOT / 'scripts/build_recaps.py', '--bundle', build / 'cache/details.bundle.json',
+                     '--as-of-ms', rating_as_of_ms])
             command([sys.executable, ROOT / 'scripts/build_weekly.py', '--bundle', build / 'cache/details.bundle.json', '--as-of-ms', rating_as_of_ms])
             command([NODE, 'prepare-achievements.mjs'], FRONT)
             command([sys.executable, ROOT / 'scripts/split_snapshot.py'])
