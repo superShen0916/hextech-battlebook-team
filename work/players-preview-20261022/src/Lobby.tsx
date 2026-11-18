@@ -82,7 +82,7 @@ export default function Lobby({snapshot,profiles,dictionary,visuals,preferences,
  <PairStudio dictionary={dictionary} onMatch={onMatch} key={self?.id||'guest'} profiles={profiles} visuals={visuals} preferences={preferences} onChoose={onChoose}/>
  <RecapStudio buildId={snapshot.build_id} profiles={profiles} dictionary={dictionary} visuals={visuals} initialId={self?.id||[...profiles].sort(comparePlayerGames)[0]?.id} onMatch={onMatch}/>
  <AchievementHall dataUrl={snapshot.achievements_url} profiles={profiles} dictionary={dictionary} visuals={visuals} onChoose={onChoose} onMatch={onMatch}/>
- <section className="lobby-moments" id="moments" ref={momentsSection}><div className="lobby-section-head"><div><p className="section-kicker">EVERYONE HAS THEIR MOMENT</p><h2>这波不录下来，可惜了</h2></div><button className="ghost memory-shuffle" onClick={()=>{track('lobby_shuffle',{detail:JSON.stringify({page:memory+1})});setMemory(memory+1)}}>再翻一页黑历史 ↻</button></div>
+ <section className="lobby-moments" id="moments" ref={momentsSection} data-highlight={highlightError?'error':highlightIndex&&highlightIndex.build_id===buildId?(weeklyHighlight?'ready':'empty'):'loading'}><div className="lobby-section-head"><div><p className="section-kicker">EVERYONE HAS THEIR MOMENT</p><h2>这波不录下来，可惜了</h2></div><button className="ghost memory-shuffle" onClick={()=>{track('lobby_shuffle',{detail:JSON.stringify({page:memory+1})});setMemory(memory+1)}}>再翻一页黑历史 ↻</button></div>
  {weeklyHighlight&&highlightPlayer&&<RoidedCard row={weeklyHighlight} profile={highlightPlayer} visual={visuals[highlightPlayer.id]} dictionary={dictionary} onOpen={()=>{
   track('recap_open',{detail:JSON.stringify({from:'roided',section:'moments'})});
   onChoose(highlightPlayer.id);
