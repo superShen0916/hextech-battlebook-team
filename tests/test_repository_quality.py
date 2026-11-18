@@ -1,9 +1,13 @@
+from contextlib import redirect_stdout
 from pathlib import Path
+import io
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]/'scripts'))
+import check_repository
 from check_repository import inspect
 
 
@@ -60,3 +64,33 @@ class RepositoryQualityTests(unittest.TestCase):
             p.write_text('on: pull_request # pull_request_target is forbidden\n'
                          '# on: pull_request_target\n', encoding='utf-8')
             self.assertEqual(inspect(root, names), [])
+
+    def test_git_enumeration_failure_in_real_checkout_fails_the_check(self):
+        """真实 checkout 里 Git 枚举失败时不得降级：已跟踪的禁用路径仍需被拒。"""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory); self.sample(root)
+            (root/'.git').mkdir()
+            tracked_forbidden = root/'outputs/token.txt'
+            tracked_forbidden.parent.mkdir(parents=True)
+            tracked_forbidden.write_text('ghp_'+'A'*36, encoding='utf-8')
+            out = io.StringIO()
+            with mock.patch.object(check_repository.subprocess, 'check_output',
+                                   side_effect=OSError('git unavailable')):
+                with mock.patch.object(sys, 'argv', ['check_repository.py', '--root', str(root)]):
+                    with redirect_stdout(out):
+                        code = check_repository.main()
+            self.assertNotEqual(code, 0)
+            self.assertIn('"ok": false', out.getvalue())
+            self.assertNotIn('ghp_'+'A'*36, out.getvalue())
+
+    def test_unpacked_directory_without_git_metadata_falls_back_to_tree_walk(self):
+        """解包出来、没有 Git 元数据的目录仍按目录遍历工作。"""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory); self.sample(root)
+            (root/'outputs').mkdir()
+            (root/'outputs/token.txt').write_text('placeholder', encoding='utf-8')
+            with mock.patch.object(check_repository.subprocess, 'check_output',
+                                   side_effect=OSError('git unavailable')):
+                names = check_repository.tracked_names(root)
+            self.assertIn('README.md', names)
+            self.assertNotIn('outputs/token.txt', names)

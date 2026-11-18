@@ -39,7 +39,7 @@ export default function Lobby({snapshot,profiles,dictionary,visuals,preferences,
    if(!entries.some(entry=>entry.isIntersecting))return;
    observer.disconnect();
    void loadRecap<RecapIndex>('/api/recaps/index.json',buildId).then(index=>{
-    if(active)setHighlightIndex(index);
+    if(active){setHighlightIndex(index);setHighlightError('');}
    }).catch(error=>{
     if(active)setHighlightError(error.message);
    });
