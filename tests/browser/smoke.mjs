@@ -126,12 +126,40 @@ try {
     const profile = [...snapshot.players].sort((a,b) => (b.summary?.games || 0) - (a.summary?.games || 0))[0];
     const full = await json(profile.detail_url);
     const uniqueRecent = new Set(snapshot.players.filter(p => p.history_scope !== 'shared').flatMap(p => (p.recent || []).map(m => m.id)));
+    const recaps = await json('/api/recaps/index.json');
+    assert.equal(recaps.build_id, snapshot.build_id, 'recaps index must belong to the published build');
+    const roided = recaps.roided || null;
+    const roidedPlayer = roided ? snapshot.players.find(p => p.id === roided.profile_id) : null;
+    assert.ok(!roided || roidedPlayer, 'roided player must be on the public roster: ' + JSON.stringify(roided && roided.profile_id));
     // Product contract: lobby shows up to 10 distinct recent matches.
     const recentCount = Math.min(10, uniqueRecent.size);
     for (const width of [1440,390,320]) {
       await page.setViewportSize({width,height:1000});
       await page.goto(url(), {waitUntil:'domcontentloaded'});
       await page.locator('.weekly-hall').waitFor();
+      // 本周最胡：卡片内容必须与 api/recaps/index.json 的 roided 对齐，不能只验证外层区块存在。
+      await page.locator('#moments').scrollIntoViewIfNeeded();
+      if (roided) {
+        await page.locator('.roided-panel').waitFor();
+        assert.equal((await page.locator('#roided-heading').innerText()).trim(), '本周最胡');
+        assert.equal((await page.locator('.roided-player-info strong').innerText()).replace('↗', '').trim(), roidedPlayer.name);
+        if (typeof roided.damage_share === 'number' && Number.isFinite(roided.damage_share)) {
+          assert.equal((await page.locator('.roided-share dd').innerText()).trim(), (roided.damage_share * 100).toFixed(1) + '%');
+        }
+        if (roided.damage != null) {
+          const shown = await page.locator('.roided-metrics div', {hasText: '单局伤害'}).first().locator('dd').innerText();
+          assert.equal(number(shown), roided.damage);
+        }
+        if (roided.kills != null && roided.deaths != null && roided.assists != null) {
+          assert.equal((await page.locator('.roided-metrics div', {hasText: 'K / D / A'}).first().locator('dd').innerText()).trim(),
+            roided.kills + ' / ' + roided.deaths + ' / ' + roided.assists);
+        }
+        await fits('本周最胡', width);
+        check(width + ': 本周最胡 card matches api/recaps/index.json (' + roidedPlayer.name + ')');
+      } else {
+        assert.equal(await page.locator('.roided-panel').count(), 0, '本周最胡：无数据时不应渲染卡片');
+        check(width + ': 本周最胡 absent without roided data');
+      }
       await count(page.locator('#lobby-recent .lobby-game'), recentCount);
       assert.equal(await page.locator('#lobby-recent .text-button').count(), recentCount);
       for (const label of ['本周涨分榜','海斗总分榜']) {
