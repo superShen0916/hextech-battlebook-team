@@ -94,3 +94,30 @@ class RepositoryQualityTests(unittest.TestCase):
                 names = check_repository.tracked_names(root)
             self.assertIn('README.md', names)
             self.assertNotIn('outputs/token.txt', names)
+
+    def test_archive_inside_another_worktree_does_not_borrow_parent_index(self):
+        """归档解包在别人的工作树里时，不能拿父仓库的索引当自己的清单。"""
+        with tempfile.TemporaryDirectory() as directory:
+            outer = Path(directory)
+            (outer/'.git').mkdir()
+            archive = outer/'archive'; archive.mkdir()
+            self.sample(archive)
+            with mock.patch.object(check_repository.subprocess, 'check_output',
+                                   side_effect=AssertionError('git must not run for an unpacked archive')):
+                names = check_repository.tracked_names(archive)
+            self.assertIn('README.md', names)
+            self.assertEqual(check_repository.inspect(archive, names), [])
+
+    def test_broken_git_symlink_still_counts_as_a_checkout(self):
+        """损坏的 .git 符号链接说明这是 checkout，不能当成无元数据的归档。"""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory); self.sample(root)
+            try:
+                (root/'.git').symlink_to(root/'missing-git-dir')
+            except (OSError, NotImplementedError):
+                self.skipTest('this platform cannot create symlinks without extra privileges')
+            self.assertTrue(check_repository.has_git_metadata(root))
+            with mock.patch.object(check_repository.subprocess, 'check_output',
+                                   side_effect=OSError('git unavailable')):
+                with self.assertRaises(check_repository.TrackedFilesUnavailable):
+                    check_repository.tracked_names(root)
