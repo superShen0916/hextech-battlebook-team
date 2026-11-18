@@ -138,7 +138,12 @@ try {
       await page.goto(url(), {waitUntil:'domcontentloaded'});
       await page.locator('.weekly-hall').waitFor();
       // 本周最胡：卡片内容必须与 api/recaps/index.json 的 roided 对齐，不能只验证外层区块存在。
+      // 滚动只触发异步加载，先等大厅把索引处理完（data-highlight 进入 ready/empty），
+      // 否则「没有卡片」在请求还没回来时天然成立，断言会假通过。
       await page.locator('#moments').scrollIntoViewIfNeeded();
+      await page.locator('#moments[data-highlight="ready"], #moments[data-highlight="empty"]').waitFor();
+      const highlightState = await page.locator('#moments').getAttribute('data-highlight');
+      assert.equal(highlightState, roided ? 'ready' : 'empty', '本周最胡：加载终态与索引数据不一致');
       if (roided) {
         await page.locator('.roided-panel').waitFor();
         assert.equal((await page.locator('#roided-heading').innerText()).trim(), '本周最胡');
