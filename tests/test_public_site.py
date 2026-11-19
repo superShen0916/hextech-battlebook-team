@@ -202,6 +202,28 @@ class PublicSiteTests(unittest.TestCase):
         self.assertEqual(records, before)
         self.assertEqual(compact_public_snapshot(snapshot), snapshot)
 
+    def test_remakes_never_reach_any_public_count(self):
+        records = [game(i) for i in range(1, 15)]
+        for index in (1, 5, 9):
+            records[index - 1]['stats_eligible'] = False
+        for match in records:
+            match['self']['damage'] = 1000  # 重开局即使数据夸张也不参与均值
+        for index in (1, 5, 9):
+            records[index - 1]['self']['damage'] = 999999
+        snapshot = build_public_snapshot(records, {'game_name': 'Owner'})
+        self.assertEqual(snapshot['overview']['saved'], 11)
+        self.assertEqual(snapshot['overview']['eligible'], 11)
+        self.assertEqual(snapshot['overview']['excluded'], 3)
+        self.assertEqual(snapshot['personal']['summary']['games'], 11)
+        self.assertEqual(len(snapshot['personal']['recent']), 11)
+        self.assertLess(snapshot['personal']['summary']['dpm'], 100000)
+        self.assertTrue(all(row['stats_eligible'] for row in snapshot['personal']['recent']))
+        self.assertEqual(snapshot['companions'][0]['shared_games'], 11)
+        self.assertEqual(snapshot['companions'][0]['summary']['games'], 11)
+        self.assertEqual(snapshot['reports']['20']['overview']['saved'], 11)
+        self.assertEqual(snapshot['reports']['20']['overview']['excluded'], 3)
+        self.assertIn('3 场重开', ' '.join(snapshot['reports']['20']['notes']))
+
     def test_loader_is_readonly_and_does_not_rewrite_matches(self):
         with tempfile.TemporaryDirectory() as directory:
             store = Store(directory)

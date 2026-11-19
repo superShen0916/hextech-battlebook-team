@@ -120,12 +120,15 @@ def _build_profile(source, account, games, coverage, ratings, public_profiles):
     from companions import _context
     from hexdata import rating_for
     identity = source['expected_puuid']
+    # 展示与统计只认有效对局；重开局计入 coverage.excluded，不参与任何均值。
+    total_saved = len(games)
+    games = [m for m in games if m.get('stats_eligible') is True]
     ids = {m['match_key']: 'm-' + hashlib.sha256(m['match_key'].encode()).hexdigest()[:20] for m in games}
     _, groups = _context(games)
     public_ids = {p: 'p-' + hashlib.sha256(p.encode()).hexdigest()[:20] for p in groups}
     view = _view(games, ids)
     view['rating'] = rating_for({'puuid': identity}, ratings)
-    view['reports'] = _reports_for(games)
+    view['reports'] = _reports_for(games, total_saved)
     view['teammates'] = _teammates_for(games, public_ids, ratings)
     # Apply the same explicit field projection as legacy views, including nested rows.
     safe = compact_public_snapshot({'personal': view})['personal']
@@ -136,6 +139,6 @@ def _build_profile(source, account, games, coverage, ratings, public_profiles):
     dates = [m['started_ms'] for m in games if isinstance(m.get('started_ms'), (int, float))]
     return {'id': source['id'], 'name': account.get('game_name') or '未命名玩家',
                     'coverage': {**coverage, 'saved': len(games), 'eligible': safe['summary']['games'],
-                                 'excluded': len(games) - safe['summary']['games'],
+                                 'excluded': total_saved - len(games),
                                  'time_range': {'oldest_ms': min(dates, default=None), 'newest_ms': max(dates, default=None)}},
                     **safe}

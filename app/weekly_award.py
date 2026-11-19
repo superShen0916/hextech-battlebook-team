@@ -120,17 +120,33 @@ def _rank_key(entry):
     return (-entry['damage_share'], -entry['damage'], -entry['started_ms'], entry['profile_id'])
 
 
-def most_roided(details, start_ms, end_ms, allowed_ids=None):
-    """Return the week's most roster-carrying single game, or None when no team qualifies.
+def top_roided(details, start_ms, end_ms, allowed_ids=None, limit=3):
+    """Return up to ``limit`` most roster-carrying single games, best first.
 
     ``details`` is any iterable of match dicts with ``started_ms`` and a ``players`` list;
     each player may carry normalized ``items``/``augments`` lists or raw Riot
     ``item0..item6`` / ``playerAugment1..playerAugment6`` fields. Nothing is written back.
+    Each game contributes only its own highest-ranked player, so one strong game can
+    never fill the whole list and every row points at a distinct battle report.
+    Ordering is the single shared ``_rank_key`` (share, damage, newest, profile id);
+    the first row is exactly what :func:`most_roided` returns.
     """
+    if type(limit) is not int or limit <= 0:
+        raise ValueError('limit must be a positive integer')
     allowed = None if allowed_ids is None else set(allowed_ids)
-    best = None
+    ranked = []
     for detail in details:
-        for entry in _detail_entries(detail, start_ms, end_ms, allowed):
-            if best is None or _rank_key(entry) < _rank_key(best):
-                best = entry
-    return best
+        entries = _detail_entries(detail, start_ms, end_ms, allowed)
+        if entries:
+            ranked.append(min(entries, key=_rank_key))
+    ranked.sort(key=_rank_key)
+    return ranked[:limit]
+
+
+def most_roided(details, start_ms, end_ms, allowed_ids=None):
+    """Return the week's most roster-carrying single game, or None when no team qualifies.
+
+    Kept as a single-result wrapper over :func:`top_roided` for existing callers.
+    """
+    ranked = top_roided(details, start_ms, end_ms, allowed_ids, limit=1)
+    return ranked[0] if ranked else None

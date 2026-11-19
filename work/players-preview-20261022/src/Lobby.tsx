@@ -47,8 +47,9 @@ export default function Lobby({snapshot,profiles,dictionary,visuals,preferences,
   observer.observe(section);
   return ()=>{active=false;observer.disconnect();};
  },[buildId,highlightRetry]);
- const weeklyHighlight=highlightIndex?.build_id===buildId?highlightIndex?.roided:null;
- const highlightPlayer=weeklyHighlight&&profiles.find(profile=>profile.id===weeklyHighlight.profile_id);
+ const weeklyRaw=highlightIndex?.build_id===buildId?highlightIndex?.roided:null;
+ const weeklyHighlights=(Array.isArray(weeklyRaw)?weeklyRaw:weeklyRaw?[weeklyRaw]:[]).slice(0,3);
+ const roidedEntries=weeklyHighlights.flatMap(row=>{const profile=profiles.find(p=>p.id===row.profile_id);return profile?[{row,profile,visual:visuals[profile.id]}]:[];});
  const[search,setSearch]=useState(''),[onlyStars,setOnlyStars]=useState(false),[lastId,setLastId]=useState<string|null>(null),[memory,setMemory]=useState(0),[sortBy,setSortBy]=useState<'weekly'|'games'|'haido'>('weekly');
  useEffect(()=>{try{setLastId(localStorage.getItem('battlebook-last-player'));}catch{}},[]);
  const self=profiles.find(p=>isRef(p,preferences.self)),last=profiles.find(p=>p.id===lastId),stars=profiles.filter(p=>preferences.stars.some(r=>isRef(p,r)));
@@ -82,10 +83,10 @@ export default function Lobby({snapshot,profiles,dictionary,visuals,preferences,
  <PairStudio dictionary={dictionary} onMatch={onMatch} key={self?.id||'guest'} profiles={profiles} visuals={visuals} preferences={preferences} onChoose={onChoose}/>
  <RecapStudio buildId={snapshot.build_id} profiles={profiles} dictionary={dictionary} visuals={visuals} initialId={self?.id||[...profiles].sort(comparePlayerGames)[0]?.id} onMatch={onMatch}/>
  <AchievementHall dataUrl={snapshot.achievements_url} profiles={profiles} dictionary={dictionary} visuals={visuals} onChoose={onChoose} onMatch={onMatch}/>
- <section className="lobby-moments" id="moments" ref={momentsSection} data-highlight={highlightError?'error':highlightIndex&&highlightIndex.build_id===buildId?(weeklyHighlight?'ready':'empty'):'loading'}><div className="lobby-section-head"><div><p className="section-kicker">EVERYONE HAS THEIR MOMENT</p><h2>这波不录下来，可惜了</h2></div><button className="ghost memory-shuffle" onClick={()=>{track('lobby_shuffle',{detail:JSON.stringify({page:memory+1})});setMemory(memory+1)}}>再翻一页黑历史 ↻</button></div>
- {weeklyHighlight&&highlightPlayer&&<RoidedCard row={weeklyHighlight} profile={highlightPlayer} visual={visuals[highlightPlayer.id]} dictionary={dictionary} onOpen={()=>{
+ <section className="lobby-moments" id="moments" ref={momentsSection} data-highlight={highlightError?'error':highlightIndex&&highlightIndex.build_id===buildId?(roidedEntries.length?'ready':'empty'):'loading'}><div className="lobby-section-head"><div><p className="section-kicker">EVERYONE HAS THEIR MOMENT</p><h2>这波不录下来，可惜了</h2></div><button className="ghost memory-shuffle" onClick={()=>{track('lobby_shuffle',{detail:JSON.stringify({page:memory+1})});setMemory(memory+1)}}>再翻一页黑历史 ↻</button></div>
+ {!!roidedEntries.length&&<RoidedCard entries={roidedEntries} dictionary={dictionary} onOpen={id=>{
   track('recap_open',{detail:JSON.stringify({from:'roided',section:'moments'})});
-  onChoose(highlightPlayer.id);
+  onChoose(id);
  }}/>}
  {highlightError&&<p className="lobby-scope" role="status">本周最胡暂时无法读取。 <button type="button" className="text-button" onClick={()=>{
   setHighlightError('');
