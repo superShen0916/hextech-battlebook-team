@@ -246,10 +246,12 @@ def build_public_snapshot(records, account_public=None, static_data=None, rating
     total_saved = len(records)
     # Keep the mixed-account guard on the full input: valid and ineligible
     # records from different accounts must still raise before any filtering.
-    _context(records)
+    # The owner confirmed on the full input stays authoritative even when
+    # filtering leaves nothing (an account may already carry a saved rating).
+    owner, _groups = _context(records)
     records = [m for m in records if m.get('stats_eligible') is True]
     excluded = total_saved - len(records)
-    owner, groups = _context(records)
+    _, groups = _context(records)
     ids = {m['match_key']: f'm{index + 1}' for index, m in enumerate(records)}
     personal = _view(records, ids)
     personal['rating'] = rating_for({'puuid': owner}, ratings)

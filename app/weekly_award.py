@@ -136,14 +136,20 @@ def top_roided(details, start_ms, end_ms, allowed_ids=None, limit=3):
     allowed = None if allowed_ids is None else set(allowed_ids)
     ranked = []
     best_per_report = {}
+    keyless_details = []  # strong refs: keeps id(detail) stable for the whole call
     for detail in details:
         entries = _detail_entries(detail, start_ms, end_ms, allowed)
         if not entries:
             continue
         entry = min(entries, key=_rank_key)
         # One battle report (match_key) occupies at most one slot, even if the
-        # caller passes duplicated details.
-        identity = entry.get('match_key') or id(detail)
+        # caller passes duplicated details. Details without a match_key fall
+        # back to object identity; the strong reference above guarantees no
+        # later object can reuse that id mid-call.
+        identity = entry.get('match_key')
+        if identity is None:
+            keyless_details.append(detail)
+            identity = id(detail)
         if identity not in best_per_report or _rank_key(entry) < _rank_key(best_per_report[identity]):
             best_per_report[identity] = entry
     ranked = sorted(best_per_report.values(), key=_rank_key)

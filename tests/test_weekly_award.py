@@ -151,6 +151,23 @@ class TopRoidedTests(unittest.TestCase):
         self.assertEqual(ranked[0]['match_key'], 'm1')
         self.assertEqual(len(ranked), len({row['match_key'] for row in ranked}))
 
+    def test_keyless_generator_details_survive_object_id_reuse(self):
+        # 无 match_key 的明细按对象身份去重；生成器逐条产出时旧对象会被回收，
+        # 新对象可能复用同一 id —— 调用期间保留强引用才不会把两局误判成一局。
+        import gc
+
+        def gen():
+            first = match(None, START + 1000, team('a', [400, 25, 25, 25, 25]))
+            yield first
+            del first
+            gc.collect()
+            yield match(None, START + 2000, team('c', [50, 50, 50, 50, 50]))
+
+        ranked = top_roided(gen(), START, END)
+        self.assertEqual(len(ranked), 2)
+        self.assertEqual(ranked[0]['profile_id'], 'a0')
+        self.assertEqual(ranked[1]['profile_id'], 'c0')
+
 
 if __name__ == '__main__':
     unittest.main()
