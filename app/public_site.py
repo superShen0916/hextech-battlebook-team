@@ -244,6 +244,9 @@ def build_public_snapshot(records, account_public=None, static_data=None, rating
     """
     records = sorted(_clean_records(records), key=lambda m: (m.get('started_ms') or 0, m['match_key']), reverse=True)
     total_saved = len(records)
+    # Keep the mixed-account guard on the full input: valid and ineligible
+    # records from different accounts must still raise before any filtering.
+    _context(records)
     records = [m for m in records if m.get('stats_eligible') is True]
     excluded = total_saved - len(records)
     owner, groups = _context(records)

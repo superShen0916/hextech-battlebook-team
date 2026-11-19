@@ -213,6 +213,16 @@ class ShareReportTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 build_share_report([], minimum_award_games=invalid)
 
+    def test_mixed_accounts_raise_even_when_one_side_is_ineligible(self):
+        # 账号 A 的有效局 + 账号 B 的无效局：身份校验必须在过滤前进行，仍然报错，
+        # 而不是把 B 的记录静默计入 A 的 excluded。
+        stranger = game(1)
+        stranger['stats_eligible'] = False
+        stranger['self']['puuid'] = 'STRANGER-SECRET'
+        stranger['participants'][0]['puuid'] = 'STRANGER-SECRET'
+        with self.assertRaises(ValueError):
+            build_share_report([game(2), stranger])
+
     def test_readonly_loader_keeps_payload_and_schema_and_uses_account_scope(self):
         with tempfile.TemporaryDirectory() as directory:
             store = Store(directory)

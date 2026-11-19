@@ -135,11 +135,18 @@ def top_roided(details, start_ms, end_ms, allowed_ids=None, limit=3):
         raise ValueError('limit must be a positive integer')
     allowed = None if allowed_ids is None else set(allowed_ids)
     ranked = []
+    best_per_report = {}
     for detail in details:
         entries = _detail_entries(detail, start_ms, end_ms, allowed)
-        if entries:
-            ranked.append(min(entries, key=_rank_key))
-    ranked.sort(key=_rank_key)
+        if not entries:
+            continue
+        entry = min(entries, key=_rank_key)
+        # One battle report (match_key) occupies at most one slot, even if the
+        # caller passes duplicated details.
+        identity = entry.get('match_key') or id(detail)
+        if identity not in best_per_report or _rank_key(entry) < _rank_key(best_per_report[identity]):
+            best_per_report[identity] = entry
+    ranked = sorted(best_per_report.values(), key=_rank_key)
     return ranked[:limit]
 
 

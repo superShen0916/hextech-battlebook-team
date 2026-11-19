@@ -43,7 +43,8 @@ export default function RoidedCard({entries, dictionary, onOpen}: Props) {
           ? (row.damage_share * 100).toFixed(1) + '%' : null;
         const kda = row.kills != null && row.deaths != null && row.assists != null
           ? row.kills + ' / ' + row.deaths + ' / ' + row.assists : null;
-        const augments = index === 0 ? buildSlots(row.augments, dictionary.augments) : [];
+        const augments = buildSlots(row.augments, dictionary.augments);
+        const items = buildSlots(row.items, dictionary.items);
         return <li className="roided-entry" key={row.match_id || `${row.profile_id}-${row.started_ms}`} data-rank={index + 1}>
           <div className="roided-entry-head">
             <span className="roided-rank" aria-label={`第 ${index + 1} 名`}>{index + 1}</span>
@@ -70,6 +71,15 @@ export default function RoidedCard({entries, dictionary, onOpen}: Props) {
               {augments.map(hex => <li key={hex.slot} data-rarity={hex.rarity}>
                 {hex.icon ? <img src={hex.icon} alt="" loading="lazy"/> : <span className="roided-augment-icon" aria-hidden="true">⬡</span>}
                 <span>{hex.name || '未知海克斯'}</span>
+              </li>)}
+            </ul>
+          </div>}
+          {!!items.length && <div className="roided-build">
+            <h4>本局装备</h4>
+            <ul className="roided-augments roided-items" aria-label="本局装备">
+              {items.map(item => <li key={item.slot}>
+                {item.icon ? <img src={item.icon} alt="" loading="lazy"/> : <span className="roided-augment-icon" aria-hidden="true">▣</span>}
+                <span>{item.name || '未知装备'}</span>
               </li>)}
             </ul>
           </div>}

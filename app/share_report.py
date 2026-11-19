@@ -124,6 +124,9 @@ def build_share_report(records, account_public=None, minimum_award_games=20, tot
     if type(minimum_award_games) is not int or minimum_award_games not in (20, 30):
         raise ValueError('minimum_award_games must be 20 or 30')
     clean = _clean_records(records)
+    # Mixed-account guard runs on the full input, before eligibility filtering,
+    # so "A valid + B ineligible" still raises exactly like the legacy path.
+    _context(clean)
     eligible = [m for m in clean if m.get('stats_eligible') is True]
     saved = len(clean) if total_saved is None else max(len(eligible), total_saved)
     excluded = saved - len(eligible)

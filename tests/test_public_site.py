@@ -224,6 +224,16 @@ class PublicSiteTests(unittest.TestCase):
         self.assertEqual(snapshot['reports']['20']['overview']['excluded'], 3)
         self.assertIn('3 场重开', ' '.join(snapshot['reports']['20']['notes']))
 
+    def test_mixed_accounts_raise_even_when_one_side_is_ineligible(self):
+        # 账号 A 的有效局 + 账号 B 的无效局：先做身份校验再做过滤，仍然报错，
+        # B 的无效局不得被静默计入 excluded。
+        stranger = game(1)
+        stranger['stats_eligible'] = False
+        stranger['self']['puuid'] = 'STRANGER-SECRET'
+        stranger['participants'][0]['puuid'] = 'STRANGER-SECRET'
+        with self.assertRaises(ValueError):
+            build_public_snapshot([game(2), stranger], {'game_name': 'Owner'})
+
     def test_loader_is_readonly_and_does_not_rewrite_matches(self):
         with tempfile.TemporaryDirectory() as directory:
             store = Store(directory)

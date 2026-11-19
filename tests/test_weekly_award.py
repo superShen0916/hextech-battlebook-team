@@ -140,6 +140,17 @@ class TopRoidedTests(unittest.TestCase):
         self.assertEqual(ranked[0]['profile_id'], 'a0')
         self.assertEqual(len({row['match_key'] for row in ranked}), len(ranked))
 
+    def test_duplicated_details_deduplicate_by_match_key(self):
+        # 调用方传入重复明细时，同一份战报仍只占一个名额，且保留其中排名最高的一项。
+        strong = team('a', [400, 25, 25, 25, 25])
+        ranked = top_roided([match('m1', START + 1000, strong),
+                             match('m1', START + 1000, team('z', [900, 5, 5, 5, 5])),
+                             match('m2', START + 2000, team('c', [50, 50, 50, 50, 50]))], START, END)
+        self.assertEqual([row['match_key'] for row in ranked], ['m1', 'm2'])
+        self.assertEqual(ranked[0]['profile_id'], 'z0')
+        self.assertEqual(ranked[0]['match_key'], 'm1')
+        self.assertEqual(len(ranked), len({row['match_key'] for row in ranked}))
+
 
 if __name__ == '__main__':
     unittest.main()
