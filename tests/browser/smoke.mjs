@@ -128,9 +128,12 @@ try {
     const uniqueRecent = new Set(snapshot.players.filter(p => p.history_scope !== 'shared').flatMap(p => (p.recent || []).map(m => m.id)));
     const recaps = await json('/api/recaps/index.json');
     assert.equal(recaps.build_id, snapshot.build_id, 'recaps index must belong to the published build');
-    const roided = recaps.roided || null;
-    const roidedPlayer = roided ? snapshot.players.find(p => p.id === roided.profile_id) : null;
-    assert.ok(!roided || roidedPlayer, 'roided player must be on the public roster: ' + JSON.stringify(roided && roided.profile_id));
+    // 本周最胡自 4.x 起是 TOP3 数组；兼容旧的单对象形态。
+    const roidedRaw = recaps.roided || null;
+    const roided = Array.isArray(roidedRaw) ? roidedRaw : (roidedRaw ? [roidedRaw] : []);
+    const roidedPlayers = roided.map(entry => snapshot.players.find(p => p.id === entry.profile_id) || null);
+    roided.forEach((entry, index) => assert.ok(roidedPlayers[index],
+      'roided player must be on the public roster: ' + JSON.stringify(entry && entry.profile_id)));
     // Product contract: lobby shows up to 10 distinct recent matches.
     const recentCount = Math.min(10, uniqueRecent.size);
     for (const width of [1440,390,320]) {
@@ -143,24 +146,28 @@ try {
       await page.locator('#moments').scrollIntoViewIfNeeded();
       await page.locator('#moments[data-highlight="ready"], #moments[data-highlight="empty"]').waitFor();
       const highlightState = await page.locator('#moments').getAttribute('data-highlight');
-      assert.equal(highlightState, roided ? 'ready' : 'empty', '本周最胡：加载终态与索引数据不一致');
-      if (roided) {
+      assert.equal(highlightState, roided.length ? 'ready' : 'empty', '本周最胡：加载终态与索引数据不一致');
+      if (roided.length) {
         await page.locator('.roided-panel').waitFor();
-        assert.equal((await page.locator('#roided-heading').innerText()).trim(), '本周最胡');
-        assert.equal((await page.locator('.roided-player-info strong').innerText()).replace('↗', '').trim(), roidedPlayer.name);
-        if (typeof roided.damage_share === 'number' && Number.isFinite(roided.damage_share)) {
-          assert.equal((await page.locator('.roided-share dd').innerText()).trim(), (roided.damage_share * 100).toFixed(1) + '%');
-        }
-        if (roided.damage != null) {
-          const shown = await page.locator('.roided-metrics div', {hasText: '单局伤害'}).first().locator('dd').innerText();
-          assert.equal(number(shown), roided.damage);
-        }
-        if (roided.kills != null && roided.deaths != null && roided.assists != null) {
-          assert.equal((await page.locator('.roided-metrics div', {hasText: 'K / D / A'}).first().locator('dd').innerText()).trim(),
-            roided.kills + ' / ' + roided.deaths + ' / ' + roided.assists);
+        assert.ok((await page.locator('#roided-heading').innerText()).trim().startsWith('本周最胡'));
+        assert.equal(await page.locator('.roided-entry').count(), roided.length, '本周最胡：卡片条数与索引不一致');
+        for (const [index, entry] of roided.entries()) {
+          const row = page.locator('.roided-entry').nth(index);
+          assert.equal((await row.locator('.roided-player-info strong').innerText()).replace('↗', '').trim(), roidedPlayers[index].name);
+          if (typeof entry.damage_share === 'number' && Number.isFinite(entry.damage_share)) {
+            assert.equal((await row.locator('.roided-share dd').innerText()).trim(), (entry.damage_share * 100).toFixed(1) + '%');
+          }
+          if (entry.damage != null) {
+            const shown = await row.locator('.roided-metrics div', {hasText: '单局伤害'}).first().locator('dd').innerText();
+            assert.equal(number(shown), entry.damage);
+          }
+          if (entry.kills != null && entry.deaths != null && entry.assists != null) {
+            assert.equal((await row.locator('.roided-metrics div', {hasText: 'K / D / A'}).first().locator('dd').innerText()).trim(),
+              entry.kills + ' / ' + entry.deaths + ' / ' + entry.assists);
+          }
         }
         await fits('本周最胡', width);
-        check(width + ': 本周最胡 card matches api/recaps/index.json (' + roidedPlayer.name + ')');
+        check(width + ': 本周最胡 card matches api/recaps/index.json (' + roidedPlayers.map(p => p.name).join(', ') + ')');
       } else {
         assert.equal(await page.locator('.roided-panel').count(), 0, '本周最胡：无数据时不应渲染卡片');
         check(width + ': 本周最胡 absent without roided data');
