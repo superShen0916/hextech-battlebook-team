@@ -10,7 +10,7 @@ from project_paths import FRONTEND
 
 sys.path.insert(0, str(ROOT))
 from haido.rating_lp import week_start_ms, WEEK_MS
-from weekly_award import most_roided
+from weekly_award import top_roided
 
 TZ = timezone(timedelta(hours=8))
 MATCHES = FRONTEND / 'public/matches'
@@ -52,25 +52,30 @@ def snapshot_as_of(snapshot):
     return None
 
 
-def week_roided(snapshot, details, as_of_ms):
-    """本周（北京时间周一 00:00 起）单局伤害占比最高的已建档玩家；无候选为 None。
+def week_roided(snapshot, details, as_of_ms, limit=3):
+    """本周（北京时间周一 00:00 起）单局伤害占比最高的已建档玩家，按占比取前 ``limit`` 条。
 
     候选只从快照里的已建档名册（`snapshot['players']` 的 id）里选，路人即使占比更高也不进榜。
+    没有候选时返回空列表；每条补一条 public match_id 方便前端跳战报。
     """
     known = {p['id'] for p in snapshot['players']}
     start = week_start_ms(as_of_ms)
     # 进行中的周截到本次构建的 as_of；跨过下周一则截到周界，保证只算一个自然周。
     through = min(start + WEEK_MS, as_of_ms)
-    pick = most_roided(details.values(), start, through, allowed_ids=known)
-    if pick is None:
-        return None
-    # most_roided 只带回明细自己的 match_key/id；补一条 public match_id 方便前端跳战报。
-    key = pick.get('match_key')
+    picks = top_roided(details.values(), start, through, allowed_ids=known, limit=limit)
+    # top_roided 只带回明细自己的 match_key/id；补一条 public match_id 方便前端跳战报。
+    public_ids = {}
     for mid, detail in details.items():
-        if key and isinstance(detail, dict) and key in (detail.get('match_key'), detail.get('id')):
-            pick['match_id'] = mid
-            break
-    return pick
+        if not isinstance(detail, dict):
+            continue
+        for key in (detail.get('match_key'), detail.get('id')):
+            if isinstance(key, str) and key:
+                public_ids.setdefault(key, mid)
+    for pick in picks:
+        key = pick.get('match_key')
+        if isinstance(key, str) and key in public_ids:
+            pick['match_id'] = public_ids[key]
+    return picks
 
 
 def recap_rows(snapshot, match_dir=MATCHES, details=None):
@@ -103,12 +108,12 @@ def night_entry(key, games):
 
 
 def recap_index(snapshot, nights, rows, roided=None):
-    """index.json 的内容：不写盘，测试可以直接核对字段。"""
+    """index.json 的内容：不写盘，测试可以直接核对字段。roided 是本周前 3 条，无候选为空数组。"""
     return {'build_id': snapshot['build_id'], 'timezone': 'Asia/Shanghai',
             'night_start_hour': 18, 'night_end_hour': 6,
             'nights': [night_entry(key, games) for key, games in sorted(nights.items(), reverse=True)],
             'players': sorted({p['profile_id'] for r in rows for p in r['members']}),
-            'team_games': len(rows), 'roided': roided}
+            'team_games': len(rows), 'roided': list(roided or [])}
 
 
 def main():
@@ -128,7 +133,7 @@ def main():
     if as_of_ms is None:
         # 两者都拿不到时退回最近一局的结束时刻：窗口仍可复现，不读当前时钟。
         as_of_ms = max((r['started_ms'] + r['duration'] * 1000 for r in rows), default=None)
-    roided = week_roided(data, details, as_of_ms) if as_of_ms is not None else None
+    roided = week_roided(data, details, as_of_ms) if as_of_ms is not None else []
     nights = defaultdict(list)
     by_player = defaultdict(list)
     for row in rows:
@@ -144,7 +149,7 @@ def main():
         write_json(dest / 'players' / (pid + '.json'), {'build_id': data['build_id'], 'games': games})
     write_json(dest / 'index.json', recap_index(data, nights, rows, roided))
     print(json.dumps({'nights': len(nights), 'team_games': len(rows), 'player_shards': len(by_player),
-                      'roided': bool(roided)}))
+                      'roided': len(roided)}))
 
 
 if __name__ == '__main__':

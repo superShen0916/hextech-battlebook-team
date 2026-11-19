@@ -85,7 +85,10 @@ class ShareReportTests(unittest.TestCase):
         after = build_share_report(records)
         self.assertEqual(after['overview']['companions'], 1)
         self.assertEqual(after['leaderboard'][0]['samples'], 20)
-        self.assertEqual(after['leaderboard'][0]['shared_games'], 21)
+        # 重开局不算同队场次：21 场里只有 20 场有效。
+        self.assertEqual(after['leaderboard'][0]['shared_games'], 20)
+        self.assertEqual(after['overview']['saved'], 20)
+        self.assertEqual(after['overview']['excluded'], 1)
 
     def test_tied_people_share_awards_and_scores_are_never_averaged(self):
         records = [game(i) for i in range(1, 21)]
@@ -188,10 +191,12 @@ class ShareReportTests(unittest.TestCase):
         before = copy.deepcopy(records)
         report = build_share_report(records, {'game_name': 'Owner', 'platform': 'TEST',
                                                'puuid': 'OWNER-SECRET', 'tag_line': 'PRIVATE-TAG'})
-        self.assertEqual(report['overview']['saved'], 22)
+        self.assertEqual(report['overview']['saved'], 21)
         self.assertEqual(report['overview']['eligible'], 21)
+        self.assertEqual(report['overview']['excluded'], 1)
+        self.assertIn('1 场重开', ' '.join(report['notes']))
         self.assertEqual(report['overview']['companions'], 1)
-        self.assertEqual(report['leaderboard'][0]['shared_games'], 21)
+        self.assertEqual(report['leaderboard'][0]['shared_games'], 20)
         self.assertEqual(report['leaderboard'][0]['games'], 20)
         serialized = json.dumps(report, allow_nan=False)
         for marker in ('puuid', 'uuid', 'OWNER-SECRET', 'ALLY-A', 'TEST_1', 'PRIVATE-TAG', 'match_key'):
@@ -201,11 +206,22 @@ class ShareReportTests(unittest.TestCase):
     def test_empty_and_invalid_options(self):
         report = build_share_report([])
         self.assertEqual(report['overview']['saved'], 0)
+        self.assertEqual(report['overview']['excluded'], 0)
         self.assertIsNone(report['overview']['win_rate'])
         self.assertTrue(all(not a['leaders'] for a in report['awards']))
         for invalid in (3, 10, 19, True, 11, 20.0):
             with self.assertRaises(ValueError):
                 build_share_report([], minimum_award_games=invalid)
+
+    def test_mixed_accounts_raise_even_when_one_side_is_ineligible(self):
+        # 账号 A 的有效局 + 账号 B 的无效局：身份校验必须在过滤前进行，仍然报错，
+        # 而不是把 B 的记录静默计入 A 的 excluded。
+        stranger = game(1)
+        stranger['stats_eligible'] = False
+        stranger['self']['puuid'] = 'STRANGER-SECRET'
+        stranger['participants'][0]['puuid'] = 'STRANGER-SECRET'
+        with self.assertRaises(ValueError):
+            build_share_report([game(2), stranger])
 
     def test_readonly_loader_keeps_payload_and_schema_and_uses_account_scope(self):
         with tempfile.TemporaryDirectory() as directory:

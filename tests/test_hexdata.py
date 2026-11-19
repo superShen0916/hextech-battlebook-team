@@ -66,6 +66,14 @@ class HexdataTests(unittest.TestCase):
         for private in ('OWNER-SECRET', 'ALLY-A', 'puuid', 'tag_line', 'PRIVATE-TAG'):
             self.assertNotIn(private, json.dumps(snapshot))
 
+    def test_rating_survives_when_every_match_is_ineligible(self):
+        # 全部对局无效（连环重开）不等于身份丢失：首次 _context 确认的 owner
+        # 必须在过滤后仍然生效，账号已有的评级照常带出。
+        records = [game(i, eligible=False) for i in range(1, 11)]
+        snapshot = build_public_snapshot(records, ratings={'OWNER-SECRET': estimate(1415)})
+        self.assertEqual(snapshot['personal']['rating']['status'], 'estimated')
+        self.assertEqual(snapshot['personal']['rating']['score'], 1415)
+
     def test_friend_hero_filter_does_not_change_account_estimate(self):
         records = [game(i) for i in range(1, 11)]
         before = copy.deepcopy(records)

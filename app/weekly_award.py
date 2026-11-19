@@ -120,17 +120,46 @@ def _rank_key(entry):
     return (-entry['damage_share'], -entry['damage'], -entry['started_ms'], entry['profile_id'])
 
 
-def most_roided(details, start_ms, end_ms, allowed_ids=None):
-    """Return the week's most roster-carrying single game, or None when no team qualifies.
+def top_roided(details, start_ms, end_ms, allowed_ids=None, limit=3):
+    """Return up to ``limit`` most roster-carrying single games, best first.
 
     ``details`` is any iterable of match dicts with ``started_ms`` and a ``players`` list;
     each player may carry normalized ``items``/``augments`` lists or raw Riot
     ``item0..item6`` / ``playerAugment1..playerAugment6`` fields. Nothing is written back.
+    Each game contributes only its own highest-ranked player, so one strong game can
+    never fill the whole list and every row points at a distinct battle report.
+    Ordering is the single shared ``_rank_key`` (share, damage, newest, profile id);
+    the first row is exactly what :func:`most_roided` returns.
     """
+    if type(limit) is not int or limit <= 0:
+        raise ValueError('limit must be a positive integer')
     allowed = None if allowed_ids is None else set(allowed_ids)
-    best = None
+    ranked = []
+    best_per_report = {}
+    keyless_details = []  # strong refs: keeps id(detail) stable for the whole call
     for detail in details:
-        for entry in _detail_entries(detail, start_ms, end_ms, allowed):
-            if best is None or _rank_key(entry) < _rank_key(best):
-                best = entry
-    return best
+        entries = _detail_entries(detail, start_ms, end_ms, allowed)
+        if not entries:
+            continue
+        entry = min(entries, key=_rank_key)
+        # One battle report (match_key) occupies at most one slot, even if the
+        # caller passes duplicated details. Details without a match_key fall
+        # back to object identity; the strong reference above guarantees no
+        # later object can reuse that id mid-call.
+        identity = entry.get('match_key')
+        if identity is None:
+            keyless_details.append(detail)
+            identity = id(detail)
+        if identity not in best_per_report or _rank_key(entry) < _rank_key(best_per_report[identity]):
+            best_per_report[identity] = entry
+    ranked = sorted(best_per_report.values(), key=_rank_key)
+    return ranked[:limit]
+
+
+def most_roided(details, start_ms, end_ms, allowed_ids=None):
+    """Return the week's most roster-carrying single game, or None when no team qualifies.
+
+    Kept as a single-result wrapper over :func:`top_roided` for existing callers.
+    """
+    ranked = top_roided(details, start_ms, end_ms, allowed_ids, limit=1)
+    return ranked[0] if ranked else None

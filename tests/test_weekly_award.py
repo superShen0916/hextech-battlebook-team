@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'app'))
-from weekly_award import most_roided
+from weekly_award import most_roided, top_roided
 
 WEEK = 7 * 24 * 60 * 60 * 1000
 # 北京时间 2026-11-16 周一 00:00，与 haido/rating_lp.py 的周切分同一时刻。
@@ -93,6 +93,80 @@ class MostRoidedTests(unittest.TestCase):
         self.assertEqual(most_roided([sunday, monday], START, END)['match_key'], 'sun')
         self.assertIsNone(most_roided([monday], START, END))
         self.assertEqual(most_roided([monday], END, END + WEEK)['match_key'], 'mon')
+
+
+class TopRoidedTests(unittest.TestCase):
+    def test_top_three_uses_the_same_rank_key_and_is_capped(self):
+        games = [
+            match('low', START + 1000, team('a', [30, 30, 30, 30, 30])),          # 0.20
+            match('high', START + 2000, team('b', [400, 25, 25, 25, 25])),       # 0.80
+            match('mid', START + 3000, team('c', [100, 50, 50, 50, 50])),        # 0.33
+            match('best', START + 4000, team('d', [700, 25, 25, 25, 25])),       # 0.88
+        ]
+        ranked = top_roided(games, START, END)
+        self.assertEqual([row['match_key'] for row in ranked], ['best', 'high', 'mid'])
+        self.assertEqual([round(row['damage_share'], 4) for row in ranked], [0.875, 0.8, round(1 / 3, 4)])
+        # 兼容包装：第一条与 most_roided 完全一致。
+        self.assertEqual(most_roided(games, START, END), ranked[0])
+        self.assertEqual(top_roided(games, START, END, limit=2),
+                         [row for row in ranked if row['match_key'] in ('best', 'high')])
+        # limit 大于候选数时返回全部候选，顺序与截断前一致。
+        full = top_roided(games, START, END, limit=10)
+        self.assertEqual([row['match_key'] for row in full], ['best', 'high', 'mid', 'low'])
+        self.assertEqual(full[:3], ranked)
+
+    def test_top_three_keeps_week_window_and_roster_filter(self):
+        early = match('early', START - 1, team('a', [900, 10, 10, 10, 10]))
+        inside = match('inside', START, team('b', [300, 10, 10, 10, 10]))
+        remake = match('remake', START + 500, team('c', [900, 10, 10, 10, 10]), stats_eligible=False)
+        ranked = top_roided([early, inside, remake], START, END, allowed_ids={'b0'})
+        self.assertEqual([row['match_key'] for row in ranked], ['inside'])
+        self.assertEqual(ranked[0]['profile_id'], 'b0')
+
+    def test_empty_input_and_invalid_limit(self):
+        self.assertEqual(top_roided([], START, END), [])
+        self.assertEqual(top_roided([], START, END, limit=1), [])
+        for bad in (0, -1, True, 3.0, None, '3'):
+            with self.assertRaises(ValueError):
+                top_roided([], START, END, limit=bad)
+
+    def test_one_game_fills_only_one_slot(self):
+        # 同一局两队各有高占比玩家，但这局只能占一个名额，卡片不会重复指向同一份战报。
+        both = (team('a', [400, 25, 25, 25, 25])
+                + team('b', [300, 20, 20, 20, 20], team_id=200))
+        ranked = top_roided([match('m1', START + 1000, both),
+                             match('m2', START + 2000, team('c', [50, 50, 50, 50, 50]))], START, END)
+        self.assertEqual([row['match_key'] for row in ranked], ['m1', 'm2'])
+        self.assertEqual(ranked[0]['profile_id'], 'a0')
+        self.assertEqual(len({row['match_key'] for row in ranked}), len(ranked))
+
+    def test_duplicated_details_deduplicate_by_match_key(self):
+        # 调用方传入重复明细时，同一份战报仍只占一个名额，且保留其中排名最高的一项。
+        strong = team('a', [400, 25, 25, 25, 25])
+        ranked = top_roided([match('m1', START + 1000, strong),
+                             match('m1', START + 1000, team('z', [900, 5, 5, 5, 5])),
+                             match('m2', START + 2000, team('c', [50, 50, 50, 50, 50]))], START, END)
+        self.assertEqual([row['match_key'] for row in ranked], ['m1', 'm2'])
+        self.assertEqual(ranked[0]['profile_id'], 'z0')
+        self.assertEqual(ranked[0]['match_key'], 'm1')
+        self.assertEqual(len(ranked), len({row['match_key'] for row in ranked}))
+
+    def test_keyless_generator_details_survive_object_id_reuse(self):
+        # 无 match_key 的明细按对象身份去重；生成器逐条产出时旧对象会被回收，
+        # 新对象可能复用同一 id —— 调用期间保留强引用才不会把两局误判成一局。
+        import gc
+
+        def gen():
+            first = match(None, START + 1000, team('a', [400, 25, 25, 25, 25]))
+            yield first
+            del first
+            gc.collect()
+            yield match(None, START + 2000, team('c', [50, 50, 50, 50, 50]))
+
+        ranked = top_roided(gen(), START, END)
+        self.assertEqual(len(ranked), 2)
+        self.assertEqual(ranked[0]['profile_id'], 'a0')
+        self.assertEqual(ranked[1]['profile_id'], 'c0')
 
 
 if __name__ == '__main__':

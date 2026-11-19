@@ -2,7 +2,7 @@ export type RecapPerson={profile_id:string;champion_id:number;kills:number;death
 export type RecapGame={id:string;match_id:string;started_ms:number;duration:number;win:boolean;members:RecapPerson[]};
 /** 本周最胡：只在已建档名册里选，缺失字段省略而不是补零。 */
 export type RecapRoided={profile_id:string;name?:string;champion_name?:string;champion_id?:number;win?:boolean;kills?:number;deaths?:number;assists?:number;damage?:number;damage_share?:number;match_key?:string;match_id?:string;started_ms?:number;items?:(number|null)[];augments?:(number|null)[]};
-export type RecapIndex={build_id:string;team_games:number;players:string[];nights:{date:string;friday:boolean;games:number;player_games?:Record<string,number>;players:string[];started_ms:number;ended_ms:number}[];roided?:RecapRoided|null};
+export type RecapIndex={build_id:string;team_games:number;players:string[];nights:{date:string;friday:boolean;games:number;player_games?:Record<string,number>;players:string[];started_ms:number;ended_ms:number}[];roided?:RecapRoided[]|RecapRoided|null};
 const cache=new Map<string,Promise<unknown>>();
 export function clearRecapCache(){cache.clear();}
 export function loadRecap<T>(path:string,revision='',options:{force?:boolean;timeoutMs?:number}={}):Promise<T>{

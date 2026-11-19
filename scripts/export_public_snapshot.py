@@ -51,6 +51,7 @@ def main() -> int:
     overview = snapshot.get('overview') or {}
     print(json.dumps({'status': 'ok', 'path': str(target), 'bytes': len(payload),
                       'saved': overview.get('saved'), 'eligible': overview.get('eligible'),
+                      'excluded': overview.get('excluded'),
                       'companions': overview.get('companions'),
                       'augments': len((snapshot.get('static') or {}).get('augments') or {}),
                       'updated_at': snapshot.get('updated_at')}, ensure_ascii=False, indent=2))

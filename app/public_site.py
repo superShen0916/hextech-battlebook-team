@@ -173,6 +173,8 @@ def compact_public_snapshot(snapshot):
 
 
 def _view(records, ids):
+    # Every displayed match is an effective one; a 1–3 minute remake never counts.
+    records = [m for m in records if m.get('stats_eligible') is True and isinstance(m.get('self'), dict)]
     insights = build_insights(records)
     result = {key: insights[key] for key in _INSIGHT_FIELDS if key in insights}
     result['recent'] = [{
@@ -207,11 +209,12 @@ def _static_dictionary(static_data):
     return result
 
 
-def _reports_for(records):
+def _reports_for(records, total_saved=None):
     return {str(minimum): {key: report[key] for key in
                            ('overview', 'awards', 'leaderboard', 'minimum_award_games', 'notes')}
             for minimum in (20, 30)
-            for report in [build_share_report(records, minimum_award_games=minimum)]}
+            for report in [build_share_report(records, minimum_award_games=minimum,
+                                              total_saved=total_saved)]}
 
 
 def _teammates_for(records, public_ids, ratings=None):
@@ -233,15 +236,28 @@ def _teammates_for(records, public_ids, ratings=None):
 
 
 def build_public_snapshot(records, account_public=None, static_data=None, ratings=None):
-    """Pure public projection: never serialize source matches or identities."""
+    """Pure public projection: never serialize source matches or identities.
+
+    Only effective matches (``stats_eligible``) are displayed or averaged; the
+    difference from the saved total is reported as ``excluded`` so remakes stay
+    explained instead of silently vanishing.
+    """
     records = sorted(_clean_records(records), key=lambda m: (m.get('started_ms') or 0, m['match_key']), reverse=True)
-    owner, groups = _context(records)
+    total_saved = len(records)
+    # Keep the mixed-account guard on the full input: valid and ineligible
+    # records from different accounts must still raise before any filtering.
+    # The owner confirmed on the full input stays authoritative even when
+    # filtering leaves nothing (an account may already carry a saved rating).
+    owner, _groups = _context(records)
+    records = [m for m in records if m.get('stats_eligible') is True]
+    excluded = total_saved - len(records)
+    _, groups = _context(records)
     ids = {m['match_key']: f'm{index + 1}' for index, m in enumerate(records)}
     personal = _view(records, ids)
     personal['rating'] = rating_for({'puuid': owner}, ratings)
     candidates = [(identity, games) for identity, games in groups.items()
-                  if sum(bool(m.get('stats_eligible')) for m in games) >= 10]
-    candidates.sort(key=lambda item: (-sum(bool(m.get('stats_eligible')) for m in item[1]), item[0]))
+                  if len(games) >= 10]
+    candidates.sort(key=lambda item: (-len(item[1]), item[0]))
     public_ids = {owner: 'personal', **{identity: f'c{index + 1}'
                                       for index, (identity, _) in enumerate(candidates)}}
     companions = []
@@ -256,7 +272,7 @@ def build_public_snapshot(records, account_public=None, static_data=None, rating
         companions.append({'id': f'c{index + 1}', 'name': games[0]['self'].get('game_name') or '未命名队友',
                            'shared_games': len(games), 'games': summary['games'], 'wins': summary['wins'],
                            'win_rate': summary['win_rate'], **view})
-    reports = _reports_for(records)
+    reports = _reports_for(records, total_saved)
     first = reports['20']['overview']
     name = account_public.get('game_name') or account_public.get('name') if isinstance(account_public, dict) else ''
     personal['verdict'] = verdict_for(name if isinstance(name, str) else '', personal.get('summary'),
@@ -267,7 +283,7 @@ def build_public_snapshot(records, account_public=None, static_data=None, rating
             'updated_at': updated, 'generated_at': updated,
             'owner': {'name': name if isinstance(name, str) else ''},
             'scope': 'owner_and_saved_same_team_matches',
-            'overview': {**{key: first[key] for key in ('saved', 'eligible', 'wins', 'win_rate', 'time_range')},
+            'overview': {**{key: first[key] for key in ('saved', 'eligible', 'excluded', 'wins', 'win_rate', 'time_range')},
                          'companions': len(companions)},
             'personal': personal, 'companions': companions, 'reports': reports,
             'static': _static_dictionary(static_data or {})})
