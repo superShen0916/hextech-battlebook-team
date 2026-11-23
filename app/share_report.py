@@ -109,23 +109,33 @@ def _public_entry(entry, metric, value, samples, minimum, rank=1):
     }
 
 
-def build_share_report(records, account_public=None, minimum_award_games=20):
+def build_share_report(records, account_public=None, minimum_award_games=20, total_saved=None):
     """Build an auditable report without I/O or modifying the caller's data.
 
     Share candidates require 20/30 eligible same-team matches. Each award
     separately requires that many calculable samples. Only the lowest-win-rate
     award can be granted at a real zero; all other awards require positivity.
     Wilson bounds express uncertainty in this selected sample, not causality.
+
+    Only ``stats_eligible`` matches reach any count or average. ``total_saved``
+    lets a caller that already dropped ineligible matches keep reporting the
+    real saved total; without it, ineligible rows in ``records`` are counted.
     """
     if type(minimum_award_games) is not int or minimum_award_games not in (20, 30):
         raise ValueError('minimum_award_games must be 20 or 30')
     clean = _clean_records(records)
-    owner, groups = _context(clean)
+    # Mixed-account guard runs on the full input, before eligibility filtering,
+    # so "A valid + B ineligible" still raises exactly like the legacy path.
+    _context(clean)
+    eligible = [m for m in clean if m.get('stats_eligible') is True]
+    saved = len(clean) if total_saved is None else max(len(eligible), total_saved)
+    excluded = saved - len(eligible)
+    owner, groups = _context(eligible)
     entries = [_entry(owner, identity, games) for identity, games in groups.items()
                if sum(bool(m.get('stats_eligible')) for m in games) >= minimum_award_games]
-    insights = build_insights(clean)
+    insights = build_insights(eligible)
     summary = insights['summary']
-    dated = [m['started_ms'] for m in clean if _number(m.get('started_ms'))]
+    dated = [m['started_ms'] for m in eligible if _number(m.get('started_ms'))]
     definitions = (
         ('best_partner', '最佳拍档', '同队胜率 Wilson 95% 下界', 'wilson_lower',
          lambda e: (e['_wilson'], e['_summary']['samples']['wins'])),
@@ -181,7 +191,8 @@ def build_share_report(records, account_public=None, minimum_award_games=20):
     return {
         'schema_version': 1, 'account': account, 'scope': 'saved_standard_same_team_matches',
         'filters': {'days': 0}, 'minimum_award_games': minimum_award_games,
-        'overview': {'saved': len(clean), 'eligible': summary['games'], 'wins': summary['wins'],
+        'overview': {'saved': len(eligible), 'eligible': summary['games'], 'excluded': excluded,
+                     'wins': summary['wins'],
                      'win_rate': summary['win_rate'], 'result_samples': summary['samples']['wins'],
                      'time_range': {'oldest_ms': min(dated, default=None), 'newest_ms': max(dated, default=None)},
                      'companions': len(entries),
@@ -194,6 +205,7 @@ def build_share_report(records, account_public=None, minimum_award_games=20):
             f'拍档榜同样要求至少 {minimum_award_games} 场有效胜负样本，分享候选人数也遵守此有效场次门槛。',
             '最佳拍档按同队胜率 Wilson 95% 下界排序，同时展示真实胜负与样本；不代表因果或个人水平。',
             '最佳损友按原始同队胜率从低到高选取；保护量只在队友治疗与队友护盾均已知时计算。',
+            *([f'{excluded} 场重开（开局不足 3 分钟）不计表现，所有场次与均值只算有效对局。'] if excluded else []),
         ],
     }
 

@@ -2,6 +2,7 @@
 from pathlib import Path
 import argparse
 import json
+import os
 import re
 import subprocess
 
@@ -75,13 +76,49 @@ def inspect(root, names):
     return errors
 
 
+class TrackedFilesUnavailable(RuntimeError):
+    """真实 checkout 里拿不到已跟踪文件清单：不能降级，否则违规文件会被洗成通过。"""
+
+
+def has_git_metadata(root):
+    """只有目标根目录自身带 .git 才算真实 checkout。
+
+    用 lexists 而不是 exists：损坏的 .git 符号链接同样说明这是 checkout，
+    不能因为链接指向不存在就被当成无元数据的解包目录。
+    """
+    return os.path.lexists(root/'.git')
+
+
+def tracked_names(root):
+    """列出待检查的文件。
+
+    判定顺序很重要：先看根目录自己有没有 .git，再决定用 Git 还是遍历。
+    先跑 git ls-files 是错的——解包目录若落在别人的工作树里，Git 会找到父仓库，
+    返回一份不含归档文件的空清单，检查随后把实际存在的 README/AGENTS/LICENSE 报成缺失。
+    真实 checkout 里 Git 枚举失败必须让检查整体失败，不能降级成目录遍历。
+    """
+    if not has_git_metadata(root):
+        skip = FORBIDDEN_PARTS | {'data', 'dist', 'node_modules'}
+        return sorted(path.relative_to(root).as_posix() for path in root.rglob('*')
+                      if path.is_file() and not skip.intersection(path.relative_to(root).parts))
+    try:
+        raw = subprocess.check_output(['git', 'ls-files', '-z'], cwd=root, stderr=subprocess.DEVNULL)
+    except (OSError, subprocess.CalledProcessError) as error:
+        raise TrackedFilesUnavailable(
+            'git 无法枚举已跟踪文件，拒绝在真实 checkout 上降级为目录遍历: %s' % error) from error
+    return [name for name in raw.decode('utf-8').split('\0') if name]
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--root', type=Path, default=ROOT)
     args = parser.parse_args()
     root = args.root.resolve()
-    raw = subprocess.check_output(['git', 'ls-files', '-z'], cwd=root)
-    names = [name for name in raw.decode('utf-8').split('\0') if name]
+    try:
+        names = tracked_names(root)
+    except TrackedFilesUnavailable as error:
+        print(json.dumps({'ok': False, 'tracked_files': 0, 'errors': [str(error)]}, ensure_ascii=False))
+        return 1
     errors = inspect(root, names)
     print(json.dumps({'ok': not errors, 'tracked_files': len(names), 'errors': errors}, ensure_ascii=False))
     return int(bool(errors))

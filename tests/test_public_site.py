@@ -202,6 +202,38 @@ class PublicSiteTests(unittest.TestCase):
         self.assertEqual(records, before)
         self.assertEqual(compact_public_snapshot(snapshot), snapshot)
 
+    def test_remakes_never_reach_any_public_count(self):
+        records = [game(i) for i in range(1, 15)]
+        for index in (1, 5, 9):
+            records[index - 1]['stats_eligible'] = False
+        for match in records:
+            match['self']['damage'] = 1000  # 重开局即使数据夸张也不参与均值
+        for index in (1, 5, 9):
+            records[index - 1]['self']['damage'] = 999999
+        snapshot = build_public_snapshot(records, {'game_name': 'Owner'})
+        self.assertEqual(snapshot['overview']['saved'], 11)
+        self.assertEqual(snapshot['overview']['eligible'], 11)
+        self.assertEqual(snapshot['overview']['excluded'], 3)
+        self.assertEqual(snapshot['personal']['summary']['games'], 11)
+        self.assertEqual(len(snapshot['personal']['recent']), 11)
+        self.assertLess(snapshot['personal']['summary']['dpm'], 100000)
+        self.assertTrue(all(row['stats_eligible'] for row in snapshot['personal']['recent']))
+        self.assertEqual(snapshot['companions'][0]['shared_games'], 11)
+        self.assertEqual(snapshot['companions'][0]['summary']['games'], 11)
+        self.assertEqual(snapshot['reports']['20']['overview']['saved'], 11)
+        self.assertEqual(snapshot['reports']['20']['overview']['excluded'], 3)
+        self.assertIn('3 场重开', ' '.join(snapshot['reports']['20']['notes']))
+
+    def test_mixed_accounts_raise_even_when_one_side_is_ineligible(self):
+        # 账号 A 的有效局 + 账号 B 的无效局：先做身份校验再做过滤，仍然报错，
+        # B 的无效局不得被静默计入 excluded。
+        stranger = game(1)
+        stranger['stats_eligible'] = False
+        stranger['self']['puuid'] = 'STRANGER-SECRET'
+        stranger['participants'][0]['puuid'] = 'STRANGER-SECRET'
+        with self.assertRaises(ValueError):
+            build_public_snapshot([game(2), stranger], {'game_name': 'Owner'})
+
     def test_loader_is_readonly_and_does_not_rewrite_matches(self):
         with tempfile.TemporaryDirectory() as directory:
             store = Store(directory)

@@ -1,9 +1,11 @@
 import { ChampionshipHero, ChampionshipPoster } from "./Championship";
-import {useEffect,useState} from 'react';
+import {useEffect,useRef,useState} from 'react';
 import LobbyNav from './LobbyNav';
 import useSectionNavigation from './useSectionNavigation';
 import AchievementHall from './Achievements';
 import RecapStudio from './RecapStudio';
+import RoidedCard from './RoidedCard';
+import {loadRecap,type RecapIndex} from '../lib/recaps';
 import WeeklyHall from './WeeklyHall';
 import MotionCard from './MotionCard';
 import RankHint from './RankHint';
@@ -24,6 +26,30 @@ const heroName=(m:{champion_id?:number;champion_name?:string},d:Dictionaries)=>d
 const jumped=(id:string)=>track('nav_jump',{detail:JSON.stringify({from:'lobby-nav',to:id})},600);
 export default function Lobby({snapshot,profiles,dictionary,visuals,preferences,save,onChoose,onMatch}:{snapshot:Snapshot;profiles:Profile[];dictionary:Dictionaries;visuals:Visuals;preferences:Preferences;save:(p:Preferences)=>void;onChoose:(id:string)=>void;onMatch:(id:string,match:Match)=>void}){
  const navigation=useSectionNavigation();
+ const momentsSection=useRef<HTMLElement>(null);
+ const [highlightIndex,setHighlightIndex]=useState<RecapIndex|null>(null);
+ const [highlightError,setHighlightError]=useState('');
+ const [highlightRetry,retryHighlight]=useState(0);
+ const buildId=snapshot.build_id;
+ useEffect(()=>{
+  const section=momentsSection.current;
+  if(!section)return;
+  let active=true;
+  const observer=new IntersectionObserver(entries=>{
+   if(!entries.some(entry=>entry.isIntersecting))return;
+   observer.disconnect();
+   void loadRecap<RecapIndex>('/api/recaps/index.json',buildId).then(index=>{
+    if(active){setHighlightIndex(index);setHighlightError('');}
+   }).catch(error=>{
+    if(active)setHighlightError(error.message);
+   });
+  },{rootMargin:'200px'});
+  observer.observe(section);
+  return ()=>{active=false;observer.disconnect();};
+ },[buildId,highlightRetry]);
+ const weeklyRaw=highlightIndex?.build_id===buildId?highlightIndex?.roided:null;
+ const weeklyHighlights=(Array.isArray(weeklyRaw)?weeklyRaw:weeklyRaw?[weeklyRaw]:[]).slice(0,3);
+ const roidedEntries=weeklyHighlights.flatMap(row=>{const profile=profiles.find(p=>p.id===row.profile_id);return profile?[{row,profile,visual:visuals[profile.id]}]:[];});
  const[search,setSearch]=useState(''),[onlyStars,setOnlyStars]=useState(false),[lastId,setLastId]=useState<string|null>(null),[memory,setMemory]=useState(0),[sortBy,setSortBy]=useState<'weekly'|'games'|'haido'>('weekly');
  useEffect(()=>{try{setLastId(localStorage.getItem('battlebook-last-player'));}catch{}},[]);
  const self=profiles.find(p=>isRef(p,preferences.self)),last=profiles.find(p=>p.id===lastId),stars=profiles.filter(p=>preferences.stars.some(r=>isRef(p,r)));
@@ -57,7 +83,17 @@ export default function Lobby({snapshot,profiles,dictionary,visuals,preferences,
  <PairStudio dictionary={dictionary} onMatch={onMatch} key={self?.id||'guest'} profiles={profiles} visuals={visuals} preferences={preferences} onChoose={onChoose}/>
  <RecapStudio buildId={snapshot.build_id} profiles={profiles} dictionary={dictionary} visuals={visuals} initialId={self?.id||[...profiles].sort(comparePlayerGames)[0]?.id} onMatch={onMatch}/>
  <AchievementHall dataUrl={snapshot.achievements_url} profiles={profiles} dictionary={dictionary} visuals={visuals} onChoose={onChoose} onMatch={onMatch}/>
- <section className="lobby-moments" id="moments"><div className="lobby-section-head"><div><p className="section-kicker">EVERYONE HAS THEIR MOMENT</p><h2>这波不录下来，可惜了</h2></div><button className="ghost memory-shuffle" onClick={()=>{track('lobby_shuffle',{detail:JSON.stringify({page:memory+1})});setMemory(memory+1)}}>再翻一页黑历史 ↻</button></div><p className="lobby-scope">从各自已收录的有效样本中挑选代表对局，尽量让不同玩家登场；不作实力排名。</p><div className="moment-grid">{highlights.map(({row,label,value})=><button className="moment-tile signature-moment" key={label} disabled={!row} onClick={()=>row&&onMatch(row.profile.id,row.match)} style={row?visualStyle(row.profile,preferences):undefined}><div className="moment-art" aria-hidden="true" style={{backgroundImage:row&&visuals[row.profile.id]?.splash_url?`url("${visuals[row.profile.id].splash_url}")`:undefined}}/><span className="moment-label">{label}</span><strong>{value}</strong>{row&&<><span className="moment-hero">{heroName(row.match.player,dictionary)}</span><span className="moment-person"><Portrait profile={row.profile} visual={visuals[row.profile.id]}/><span>{row.profile.name}<small>{day(row.match.started_ms)} · {row.profile.history_scope==='shared'?'同队样本':'个人历史'}</small></span></span></>}<span className="moment-link">回看这场 ↗</span></button>)}</div></section>
+ <section className="lobby-moments" id="moments" ref={momentsSection} data-highlight={highlightError?'error':highlightIndex&&highlightIndex.build_id===buildId?(roidedEntries.length?'ready':'empty'):'loading'}><div className="lobby-section-head"><div><p className="section-kicker">EVERYONE HAS THEIR MOMENT</p><h2>这波不录下来，可惜了</h2></div><button className="ghost memory-shuffle" onClick={()=>{track('lobby_shuffle',{detail:JSON.stringify({page:memory+1})});setMemory(memory+1)}}>再翻一页黑历史 ↻</button></div>
+ {!!roidedEntries.length&&<RoidedCard entries={roidedEntries} dictionary={dictionary} onOpen={id=>{
+  track('recap_open',{detail:JSON.stringify({from:'roided',section:'moments'})});
+  onChoose(id);
+ }}/>}
+ {highlightError&&<p className="lobby-scope" role="status">本周最胡暂时无法读取。 <button type="button" className="text-button" onClick={()=>{
+  setHighlightError('');
+  if(highlightError.includes('战报正在更新'))location.reload();
+  else retryHighlight(attempt=>attempt+1);
+ }}>{highlightError.includes('战报正在更新')?'刷新页面':'重试'}</button></p>}
+ <p className="lobby-scope">从各自已收录的有效样本中挑选代表对局，尽量让不同玩家登场；不作实力排名。</p><div className="moment-grid">{highlights.map(({row,label,value})=><button className="moment-tile signature-moment" key={label} disabled={!row} onClick={()=>row&&onMatch(row.profile.id,row.match)} style={row?visualStyle(row.profile,preferences):undefined}><div className="moment-art" aria-hidden="true" style={{backgroundImage:row&&visuals[row.profile.id]?.splash_url?`url("${visuals[row.profile.id].splash_url}")`:undefined}}/><span className="moment-label">{label}</span><strong>{value}</strong>{row&&<><span className="moment-hero">{heroName(row.match.player,dictionary)}</span><span className="moment-person"><Portrait profile={row.profile} visual={visuals[row.profile.id]}/><span>{row.profile.name}<small>{day(row.match.started_ms)} · {row.profile.history_scope==='shared'?'同队样本':'个人历史'}</small></span></span></>}<span className="moment-link">回看这场 ↗</span></button>)}</div></section>
  <section className="lobby-recent" id="lobby-recent"><div className="lobby-section-head"><div><p className="section-kicker">RECENT GAMES</p><h2>说好最后一把，怎么又开了</h2></div><span className="section-context">来自已接入的个人历史 · 同场合并</span></div><div className="lobby-game-list">{recent.map(({match,people})=><article className="lobby-game" key={match.id}><div className="lobby-game-date"><strong>{day(match.started_ms)}</strong><span>{day(match.started_ms,true).split(' ').at(-1)} · {n((match.duration||0)/60)} 分钟</span></div><div className="lobby-game-people">{people.map(({profile,match:m})=><button key={profile.id} onClick={()=>onMatch(profile.id,m)}><Portrait profile={profile} visual={visuals[profile.id]}/><span className="game-person-name">{profile.name}<small>{heroName(m.player,dictionary)} · {n(m.player.kills)} / {n(m.player.deaths)} / {n(m.player.assists)}</small></span><span className={'result-tag '+(m.player.win?'win':'loss')}>{m.player.win?'胜':'负'}</span></button>)}</div><button className="text-button" onClick={()=>onMatch(people[0].profile.id,people[0].match)}>看战报 ↗</button></article>)}</div></section>
  <footer className="club-footer"><div className="club-brand"><span className="club-logo">⬡</span><span>海克斯战报馆<small>一起打过的每一场，都值得记住。</small></span></div><p>标准海克斯大乱斗 · 更新于 {snapshot.updated_at?day(new Date(snapshot.updated_at).getTime()):'—'}<br/>仅展示已收录战绩；MVP / ACE 为工具自评。<br/><a className="championship-footer-link" href="#championship-week">BLG 夺冠周活动 ↑</a></p></footer>
  </div>

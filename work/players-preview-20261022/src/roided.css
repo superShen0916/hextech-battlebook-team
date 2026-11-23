@@ -1,0 +1,88 @@
+.roided-panel {
+  margin: 0 0 16px;
+  padding: 16px 18px;
+  border: 1px solid #776449;
+  border-radius: 14px;
+  color: #eef1f8;
+  background: radial-gradient(ellipse at 8% 0, #e5c37c1f, transparent 64%), #111e30;
+}
+.roided-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+.roided-heading h3 { margin: 0; color: #f1cf86; font-size: 24px; }
+.roided-topn { font-size: 13px; letter-spacing: .08em; color: #a9b8cd; font-weight: 600; margin-left: 4px; }
+.roided-range, .roided-foot, .roided-meta time { color: #aebbd0; font-size: 12px; }
+
+.roided-list {
+  list-style: none;
+  margin: 0 0 10px;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  align-items: stretch;
+}
+.roided-entry {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid #3c4f68;
+  border-radius: 12px;
+  background: #152238;
+}
+.roided-entry[data-rank="1"] { border-color: #a8863f; background: linear-gradient(160deg, #e5c37c14, transparent 60%), #152238; }
+.roided-entry-head { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.roided-rank {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  border: 1px solid #6c7f97;
+  color: #dfe6f2;
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.roided-entry[data-rank="1"] .roided-rank { border-color: #f1cf86; color: #f1cf86; }
+.roided-player { display: flex; align-items: center; text-align: left; gap: 9px; border: 0; padding: 0; color: inherit; background: transparent; min-width: 0; flex: 1; }
+.roided-player:focus-visible { outline: 2px solid #f1cf86; outline-offset: 4px; }
+.roided-player .profile-portrait { width: 34px; height: 34px; }
+.roided-player-info { display: grid; gap: 2px; overflow-wrap: anywhere; min-width: 0; }
+.roided-player-info strong { font-size: 15px; }
+.roided-player-info > span { color: #becae0; font-size: 12px; }
+.roided-player-info strong span { color: #f1cf86; }
+.roided-result { border: 1px solid #b97984; color: #efb0b9; border-radius: 999px; font-size: 11px; padding: 2px 7px; flex: none; }
+.roided-result[data-win="true"] { border-color: #65a990; color: #a2e9ce; }
+
+.roided-metrics { display: flex; align-items: end; gap: 6px 16px; flex-wrap: wrap; margin: 2px 0 0; font-variant-numeric: tabular-nums; }
+.roided-metrics > div { display: grid; gap: 1px; min-width: 0; }
+.roided-metrics dt { grid-row: 2; color: #aebbd0; font-size: 11px; }
+.roided-metrics dd { margin: 0; font-size: 15px; font-weight: 650; color: #eef1f8; }
+.roided-metrics .roided-share dd { font-size: 24px; line-height: 1.05; color: #f1cf86; }
+.roided-meta { margin-top: auto; padding-top: 2px; }
+
+.roided-build h4 { margin: 2px 0 6px; color: #f1cf86; font-size: 13px; }
+.roided-augments { list-style: none; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px; margin: 0; padding: 0; }
+.roided-augments li { display: grid; grid-template-columns: 24px minmax(0, 1fr); align-items: center; gap: 6px; padding: 4px 6px; min-height: 34px; background: #1c2b41; border: 1px solid #53657b; border-radius: 8px; font-size: 12px; font-weight: 650; overflow-wrap: anywhere; }
+.roided-augments li[data-rarity="gold"] { border-color: #937241; }
+.roided-augments li[data-rarity="prismatic"] { border-color: #a78ce1; background: linear-gradient(120deg, #343158, #1c2b41); }
+.roided-augments img { width: 100%; display: block; }
+.roided-augment-icon { text-align: center; color: #f1cf86; }
+.roided-foot { margin: 9px 0 0; line-height: 1.55; }
+
+@media (max-width: 900px) {
+  .roided-list { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  .roided-entry .roided-augments { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 700px) {
+  .roided-panel { padding: 12px; }
+  .roided-heading { margin-bottom: 8px; }
+  .roided-heading h3 { font-size: 21px; }
+  .roided-entry { padding: 10px; }
+  .roided-metrics { column-gap: 12px; }
+  .roided-metrics dd { font-size: 14px; }
+  .roided-metrics .roided-share dd { font-size: 21px; }
+  .roided-foot { font-size: 11px; }
+}
